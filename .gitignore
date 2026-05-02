@@ -1,0 +1,20 @@
+# Build outputs
+bin/
+dist/
+build/
+
+# Go
+*.exe
+*.test
+*.out
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Generated artifacts
+logs/*
+reports/*
+!logs/.gitkeep
+!reports/.gitkeep
