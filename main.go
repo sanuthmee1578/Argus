@@ -3,9 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"context"
-	"time"
+	"argus/internal/runner"
+	"argus/internal/logger"
 )
 
 func main() {
@@ -29,34 +28,12 @@ func main() {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "python3", script)
-
-	
-	output, err := cmd.CombinedOutput()
-
-	var success string
-
-	if (ctx.Err() == context.DeadlineExceeded) {
-		fmt.Println("Script execution timed out")
-		success = "Timed out"
-	}else if err !=nil {
-		fmt.Println("Error executing Script:", err)
-		success = "Error"
-	}else{
-		success = "Success"
-		fmt.Println(string(output))
-	}
-
-	log := "\nScript:" + script + "\nStatus: " + success + "\nOutput:" + string(output)
-
-	err = os.WriteFile("./logs/latest.log", []byte(log), 0644)
+	status, output := runner.Run(script)
+	err := logger.Write(script, status, output)
 	if err != nil {
-		fmt.Println("Error writing to log file:", err)
+		fmt.Println("Error writing log:", err)
 		return
 	}
-
-	fmt.Println("Log written to file:", "./logs/latest.log")
+	fmt.Println("Status:", status)
+	fmt.Println("Output:", output)
 }
