@@ -12,12 +12,12 @@ As AI-assisted development becomes widespread, developers increasingly run unfam
 
 Modern development workflows introduce new risks:
 
-- ⚠ Running AI-generated or unknown scripts
-- ⚠ Infinite loops causing CPU exhaustion
-- ⚠ Unauthorized file access (e.g., SSH keys)
-- ⚠ Data exfiltration via network calls
-- ⚠ Dependency vulnerabilities
-- ⚠ Lack of visibility into runtime behavior
+- Running AI-generated or unknown scripts
+- Infinite loops causing CPU exhaustion
+- Unauthorized file access (e.g., SSH keys)
+- Data exfiltration via network calls
+- Dependency vulnerabilities
+- Lack of visibility into runtime behavior
 
 Traditional tools are either too complex (cloud sandboxes) or too limited (simple script runners).
 
