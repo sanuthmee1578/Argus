@@ -81,24 +81,24 @@ Argus introduces a **multi-layered execution pipeline**:
 
 ## System Architecture
 User (CLI)
-      ↓
+↓
 Command Interface (argus run / scan)
-      ↓
+↓
 Policy Engine (rules, profiles)
-      ↓
+↓
 Static Analyzer (SAST-lite)
-      ↓
+↓
 Execution Engine (Go runtime)
-      ↓
+↓
 Linux Control Layer
 ├── Process Control (exec, kill)
 ├── Resource Limits (ulimit / cgroups)
 ├── Isolation (namespaces - future)
-      ↓
+↓
 Runtime Monitor
-      ↓
+↓
 Enforcement Engine
-      ↓
+↓
 Logger & Reporter
 
 
