@@ -19,6 +19,11 @@ func main() {
 	command := os.Args[1]
 	script := os.Args[2]
 
+	if _, err := os.Stat(script); os.IsNotExist(err) {
+		fmt.Println("Script not found:", script)
+		return
+   }
+
 	// Print the command and script for debugging purposes
 	fmt.Println("Command:", command)
 	fmt.Println("Script:", script)
