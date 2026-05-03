@@ -35,18 +35,28 @@ func main() {
 	cmd := exec.CommandContext(ctx, "python3", script)
 
 	
-	
 	output, err := cmd.CombinedOutput()
+
+	var success string
 
 	if (ctx.Err() == context.DeadlineExceeded) {
 		fmt.Println("Script execution timed out")
+		success = "Timed out"
+	}else if err !=nil {
+		fmt.Println("Error executing Script:", err)
+		success = "Error"
+	}else{
+		success = "Success"
+		fmt.Println(string(output))
+	}
+
+	log := "\nScript:" + script + "\nStatus: " + success + "\nOutput:" + string(output)
+
+	err = os.WriteFile("./logs/latest.log", []byte(log), 0644)
+	if err != nil {
+		fmt.Println("Error writing to log file:", err)
 		return
 	}
 
-	if err !=nil {
-		fmt.Println("Error executing Script:", err)
-	}else{
-		fmt.Println(string(output))
-	}
-	
+	fmt.Println("Log written to file:", "./logs/latest.log")
 }
