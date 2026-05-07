@@ -5,6 +5,7 @@ import (
 	"os"
 	"argus/internal/runner"
 	"argus/internal/logger"
+	"argus/internal/scanner"
 )
 
 func main() {
@@ -23,10 +24,19 @@ func main() {
 		fmt.Println("Script not found:", script)
 		return
    }
+   warnings := scanner.Scan(script)
 
 	// Print the command and script for debugging purposes
 	fmt.Println("Command:", command)
 	fmt.Println("Script:", script)
+
+	if len(warnings) > 0 {
+		fmt.Println("⚠ Suspicious patterns detected:")
+
+		for _, warning := range warnings {
+			fmt.Println("-", warning)
+		}
+	}
 
 	if command != "run" {
 		fmt.Println("Unknown command:",command)
