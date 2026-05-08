@@ -31,11 +31,33 @@ func main() {
 	fmt.Println("Script:", script)
 
 	if len(warnings) > 0 {
-		fmt.Println("⚠ Suspicious patterns detected:")
+		var choice string
+		fmt.Println("⚠ Suspicious patterns detected in the script. Do you want to proceed? (y/n)")
+		fmt.Scanln(&choice)
+		if(choice != "y"){
+			fmt.Println("Execution aborted by the user.")
+			fmt.Println("⚠ Warning:")
+			for _, warning := range warnings {
+				fmt.Println("-", warning)
+			}
+			return
+		}else if choice == "y" {
+			fmt.Println("Proceeding with execution...")
+			fmt.Println("⚠ Warning:")
+			for _, warning := range warnings {
+				fmt.Println("-", warning)
+			}
+			status, output := runner.Run(script)
+			err := logger.Write(script, status, output)
+			if err != nil {
+				fmt.Println("Error writing log:", err)
+				return
+			}
+			fmt.Println("Status:", status)
+			fmt.Println("Output:", output)
+		} 
 
-		for _, warning := range warnings {
-			fmt.Println("-", warning)
-		}
+		
 	}
 
 	if command != "run" {
@@ -43,12 +65,5 @@ func main() {
 		return
 	}
 
-	status, output := runner.Run(script)
-	err := logger.Write(script, status, output)
-	if err != nil {
-		fmt.Println("Error writing log:", err)
-		return
-	}
-	fmt.Println("Status:", status)
-	fmt.Println("Output:", output)
+	
 }
