@@ -48,7 +48,7 @@ func main() {
 				fmt.Println("-", warning)
 			}
 			status, output := runner.Run(script)
-			err := logger.Write(script, status, output)
+			err := logger.Write(script, status, output, warnings)
 			if err != nil {
 				fmt.Println("Error writing log:", err)
 				return
