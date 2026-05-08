@@ -4,15 +4,27 @@ import (
 	"os"
 )
 
-func Write(script string, status string, output string) error {
-	log := "\nScript: " + script +
-		"\nStatus: " + status +
-		"\nOutput:\n" + output
+func Write(script string, status string, output string, warnings []string) error {
+	report := "ARGUS EXECUTION REPORT\n"
+	report += "Script: " + script + "\n"
+	report += "Status: " + status + "\n"
+	report += "Output:\n" + output + "\n"
+	report += "Warnings:\n"
 
-	err := os.WriteFile("./logs/latest.log", []byte(log), 0644)
-	if err != nil {
-		return err
+	if len(warnings) > 0 {
+	for _, warning := range warnings {
+		report += "- " + warning + "\n"
+	}
+	}else{
+		report += "None\n"
 	}
 
+	err := os.WriteFile("./logs/report.log", []byte(report), 0644)
+		if err != nil {
+			return err
+		}
+
 	return nil
-}
+
+	}
+	
