@@ -1,0 +1,8 @@
+{
+    "timeout": 5,
+    "strict_mode": true,
+    "blocked_patterns": [
+        "rm -rf",
+        "os.system"
+    ]
+}

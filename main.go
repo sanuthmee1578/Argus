@@ -6,9 +6,15 @@ import (
 	"argus/internal/runner"
 	"argus/internal/logger"
 	"argus/internal/scanner"
+	"argus/internal/policy"
 )
 
 func main() {
+
+	loadPolicy := policy.Load()
+	fmt.Println(loadPolicy.Timeout)
+	fmt.Println(loadPolicy.StrictMode)
+	fmt.Println(loadPolicy.BlockedPatterns)
 
 	// Check if enough arguments are provided
 	if len(os.Args) < 3 {
