@@ -30,13 +30,13 @@ func main() {
 		fmt.Println("Script not found:", script)
 		return
    }
-   warnings := scanner.Scan(script)
+
+   loadPolicy := policy.Load()
+   warnings := scanner.Scan(loadPolicy.BlockedPatterns, script)
 
 	// Print the command and script for debugging purposes
 	fmt.Println("Command:", command)
 	fmt.Println("Script:", script)
-
-	loadPolicy := policy.Load()
 
 	if len(warnings) > 0 {
 		if(loadPolicy.StrictMode){
