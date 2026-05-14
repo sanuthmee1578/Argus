@@ -1,0 +1,7 @@
+{
+    "timeout": 5,
+    "strict_mode": true,
+    "blocked_patterns": [
+        "os.system"
+    ]
+}
