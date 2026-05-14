@@ -7,9 +7,10 @@ import (
 	"time"
 )
 
-func Run(script string) (string, string) {
+func Run(script string) (string, string, time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	startTime := time.Now()
 
 	cmd := exec.CommandContext(ctx, "python3", script)
 
@@ -17,11 +18,12 @@ func Run(script string) (string, string) {
 
 	if ctx.Err() == context.DeadlineExceeded {
 		fmt.Println("Script execution timed out")
-		return "TIMEOUT", string(output)
+		return "TIMEOUT", string(output), time.Since(startTime)
 	} else if err != nil {
 		fmt.Println("Error executing Script:", err)
-		return "ERROR", string(output)
+		return "ERROR", string(output), time.Since(startTime)
 	}
 
-	return "SUCCESS", string(output)
+	sinceTime := time.Since(startTime)
+	return "SUCCESS", string(output), sinceTime
 }

@@ -69,7 +69,7 @@ func main() {
 			} 
 		}
 	}
-	status, output := runner.Run(script)
+	status, output,duration := runner.Run(script)
 				err := logger.Write(script, status, output, warnings)
 				if err != nil {
 					fmt.Println("Error writing log:", err)
@@ -77,4 +77,5 @@ func main() {
 				}
 				fmt.Println("Status:", status)
 				fmt.Println("Output:", output)
+				fmt.Printf("Execution time: %v\n", duration)
 }
