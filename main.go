@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 	"argus/internal/runner"
 	"argus/internal/logger"
 	"argus/internal/scanner"
@@ -41,7 +42,7 @@ func main() {
 	if len(warnings) > 0 {
 		if(loadPolicy.StrictMode){
 			fmt.Println("⚠ Strict mode enabled. Execution blocked due to suspicious patterns.")
-			logger.Write(script, "BLOCKED_BY_POLICY", "Script blocked due to strict mode.", warnings)
+			logger.Write(script, "BLOCKED_BY_POLICY", "Script blocked due to strict mode.", warnings, time.Duration(0))
 			return
 		}else {
 			var choice string
@@ -54,7 +55,7 @@ func main() {
 					fmt.Println("-", warning)
 				}
 
-				err := logger.Write(script, "BLOCKED_BY_USER", "Execution aborted by the user.", warnings)
+				err := logger.Write(script, "BLOCKED_BY_USER", "Execution aborted by the user.", warnings, time.Duration(0))
 					if err != nil {
 					fmt.Println("Error writing log:", err)
 				}
@@ -70,7 +71,7 @@ func main() {
 		}
 	}
 	status, output,duration := runner.Run(script)
-				err := logger.Write(script, status, output, warnings)
+				err := logger.Write(script, status, output, warnings, duration)
 				if err != nil {
 					fmt.Println("Error writing log:", err)
 					return
