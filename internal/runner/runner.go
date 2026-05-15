@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-func Run(script string) (string, string, time.Duration) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func Run(script string, timeout time.Duration) (string, string, time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	startTime := time.Now()
 

@@ -70,7 +70,8 @@ func main() {
 			} 
 		}
 	}
-	status, output,duration := runner.Run(script)
+	timeout := time.Duration(loadPolicy.Timeout) * time.Second
+	status, output,duration:= runner.Run(script, timeout)
 				err := logger.Write(script, status, output, warnings, duration)
 				if err != nil {
 					fmt.Println("Error writing log:", err)
