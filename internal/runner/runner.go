@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"time"
+	"bytes"
 )
 
 func Run(script string, timeout time.Duration) (string, string, time.Duration) {
@@ -14,7 +15,22 @@ func Run(script string, timeout time.Duration) (string, string, time.Duration) {
 
 	cmd := exec.CommandContext(ctx, "python3", script)
 
-	output, err := cmd.CombinedOutput()
+	var outputBuffer bytes.Buffer
+	cmd.Stdout = &outputBuffer
+	cmd.Stderr = &outputBuffer
+
+	err := cmd.Start()
+	if err != nil {
+		fmt.Println("Error starting Script:", err)
+		return "ERROR", "", time.Since(startTime)
+	}
+
+	pid := cmd.Process.Pid
+	fmt.Println("Script PID:", pid)
+
+	err = cmd.Wait()
+
+	output := outputBuffer.String()
 
 	if ctx.Err() == context.DeadlineExceeded {
 		fmt.Println("Script execution timed out")
