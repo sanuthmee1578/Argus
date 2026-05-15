@@ -3,14 +3,16 @@ package logger
 import (
 	"os"
 	"time"
+	"strconv"
 )
 
-func Write(script string, status string, output string, warnings []string, duration time.Duration) error {
+func Write(script string, status string, output string, warnings []string, duration time.Duration, pid int) error {
 	report := "ARGUS EXECUTION REPORT\n"
 	report += "Script: " + script + "\n"
 	report += "Status: " + status + "\n"
 	report += "Output:\n" + output + "\n"
 	report +=  "Execution Time: " + duration.String() + "\n"
+	report += "Process ID: " + strconv.Itoa(pid) + "\n"
 	report += "Warnings:\n"
 	
 	if len(warnings) > 0 {

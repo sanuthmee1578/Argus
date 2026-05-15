@@ -8,7 +8,7 @@ import (
 	"bytes"
 )
 
-func Run(script string, timeout time.Duration) (string, string, time.Duration) {
+func Run(script string, timeout time.Duration) (string, string, time.Duration, int) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	startTime := time.Now()
@@ -22,10 +22,11 @@ func Run(script string, timeout time.Duration) (string, string, time.Duration) {
 	err := cmd.Start()
 	if err != nil {
 		fmt.Println("Error starting Script:", err)
-		return "ERROR", "", time.Since(startTime)
+		return "ERROR", "", time.Since(startTime),0
 	}
 
 	pid := cmd.Process.Pid
+	
 	fmt.Println("Script PID:", pid)
 
 	err = cmd.Wait()
@@ -34,12 +35,12 @@ func Run(script string, timeout time.Duration) (string, string, time.Duration) {
 
 	if ctx.Err() == context.DeadlineExceeded {
 		fmt.Println("Script execution timed out")
-		return "TIMEOUT", string(output), time.Since(startTime)
+		return "TIMEOUT", string(output), time.Since(startTime),pid
 	} else if err != nil {
 		fmt.Println("Error executing Script:", err)
-		return "ERROR", string(output), time.Since(startTime)
+		return "ERROR", string(output), time.Since(startTime),pid
 	}
 
 	sinceTime := time.Since(startTime)
-	return "SUCCESS", string(output), sinceTime
+	return "SUCCESS", string(output), sinceTime,pid
 }

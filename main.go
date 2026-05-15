@@ -42,7 +42,7 @@ func main() {
 	if len(warnings) > 0 {
 		if(loadPolicy.StrictMode){
 			fmt.Println("⚠ Strict mode enabled. Execution blocked due to suspicious patterns.")
-			logger.Write(script, "BLOCKED_BY_POLICY", "Script blocked due to strict mode.", warnings, time.Duration(0))
+			logger.Write(script, "BLOCKED_BY_POLICY", "Script blocked due to strict mode.", warnings, time.Duration(0), 0)
 			return
 		}else {
 			var choice string
@@ -55,7 +55,7 @@ func main() {
 					fmt.Println("-", warning)
 				}
 
-				err := logger.Write(script, "BLOCKED_BY_USER", "Execution aborted by the user.", warnings, time.Duration(0))
+				err := logger.Write(script, "BLOCKED_BY_USER", "Execution aborted by the user.", warnings, time.Duration(0), 0)
 					if err != nil {
 					fmt.Println("Error writing log:", err)
 				}
@@ -71,8 +71,8 @@ func main() {
 		}
 	}
 	timeout := time.Duration(loadPolicy.Timeout) * time.Second
-	status, output,duration:= runner.Run(script, timeout)
-				err := logger.Write(script, status, output, warnings, duration)
+	status, output,duration,pid:= runner.Run(script, timeout)
+				err := logger.Write(script, status, output, warnings, duration, pid)
 				if err != nil {
 					fmt.Println("Error writing log:", err)
 					return
