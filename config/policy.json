@@ -1,5 +1,5 @@
 {
-    "timeout": 5,
+    "timeout": 15,
     "strict_mode": true,
     "blocked_patterns": [
         "os.system"
