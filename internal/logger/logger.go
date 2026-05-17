@@ -6,13 +6,15 @@ import (
 	"strconv"
 )
 
-func Write(script string, status string, output string, warnings []string, duration time.Duration, pid int) error {
+func Write(script string, status string, output string, warnings []string, duration time.Duration, pid int, startTime time.Time, endTime time.Time) error {
 	report := "ARGUS EXECUTION REPORT\n"
 	report += "Script: " + script + "\n"
 	report += "Status: " + status + "\n"
 	report += "Output:\n" + output + "\n"
 	report +=  "Execution Time: " + duration.String() + "\n"
 	report += "Process ID: " + strconv.Itoa(pid) + "\n"
+	report += "Start Time: " + startTime.Format("2006-01-02 15:04:05") + "\n"
+	report += "End Time: " + endTime.Format("2006-01-02 15:04:05") + "\n"
 	report += "Warnings:\n"
 	
 	if len(warnings) > 0 {
