@@ -6,10 +6,10 @@ import (
 )
 
 type Policy struct {
-	Timeout   int      `json:"timeout"`
-	StrictMode       bool     `json:"strict_mode"`
+	Timeout    int  `json:"timeout"`
+	StrictMode bool `json:"strict_mode"`
 
-	BlockedPatterns  []string `json:"blocked_patterns"`
+	BlockedPatterns []string `json:"blocked_patterns"`
 }
 
 func Load() Policy {
