@@ -29,12 +29,21 @@ func Run(script string, timeout time.Duration) (string, string, time.Duration, i
 
 	pid := cmd.Process.Pid
 
+	done := make(chan struct{})
+
+	monitorResultsChan := make(chan map[string]string)
+
+	go func() {
+      monitorResultsChan <- monitor.PollStatus(pid, 100*time.Millisecond, done)
+	}()
+
 	fmt.Println("Script PID:", pid)
 
-	monitorResults := monitor.ReadStatus(pid)
-	fmt.Println("Initial Monitor Results:", monitorResults)
-
 	err = cmd.Wait()
+
+	close(done)
+
+	monitorResults := <-monitorResultsChan
 
 	endTime := time.Now()
 
