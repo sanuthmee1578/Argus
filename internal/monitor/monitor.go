@@ -5,14 +5,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func ReadStatus(pid int) map[string]string {
-
 	results := map[string]string{}
 
 	pidString := strconv.Itoa(pid)
-
 	path := "/proc/" + pidString + "/status"
 
 	data, err := os.ReadFile(path)
@@ -21,30 +20,50 @@ func ReadStatus(pid int) map[string]string {
 		return results
 	}
 
-	content := string(data)
+	lines := strings.Split(string(data), "\n")
 
-	lines := strings.Split(content, "\n")
+	fieldsToRead := map[string]bool{
+		"State:": true,
+		"VmRSS:": true,
+		"Threads:": true,
+	}
 
 	for _, line := range lines {
-		found := strings.Contains(line, "State:")
-
-		if found {
-			results["State"] = line
-		}
-
-		found = strings.Contains(line, "VmRSS:")
-
-		if found {
-			results["VmRSS"] = line
-		}
-
-		found = strings.Contains(line, "Threads:")
-
-		if found {
-			results["Threads"] = line
+		for field := range fieldsToRead {
+			if strings.HasPrefix(line, field) {
+				parts := strings.SplitN(line, ":\t", 2)
+				if len(parts) == 2 {
+					key := field[:len(field)-1]
+					results[key] = strings.TrimSpace(parts[1])
+				}
+				break
+			}
 		}
 	}
 
 	return results
+}
 
+func PollStatus(pid int, interval time.Duration, done <-chan struct{}) map[string]string {
+    ticker := time.NewTicker(interval)
+    defer ticker.Stop()
+
+    peakVmRSS := "0 kB"
+
+    for {
+        select {
+        case <-done:
+            return map[string]string{
+                "PeakVmRSS": peakVmRSS,
+            }
+
+        case <-ticker.C:
+            status := ReadStatus(pid)
+            current := status["VmRSS"]
+
+            if current != "" {
+                peakVmRSS = current
+            }
+        }
+    }
 }
