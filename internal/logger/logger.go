@@ -32,7 +32,11 @@ func Write(script string, status string, output string, warnings []string, durat
 		}
 	}
 
-	err := os.WriteFile("./logs/report.log", []byte(report), 0644)
+	timestamp := time.Now().Format("2006-01-02T15-04-05")
+
+	filename := "./reports/run_" + timestamp + "_" + status + ".log"
+
+	err := os.WriteFile(filename, []byte(report), 0644)
 	if err != nil {
 		return err
 	}
