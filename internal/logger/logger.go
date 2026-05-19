@@ -27,8 +27,8 @@ func Write(script string, status string, output string, warnings []string, durat
 
 	if len(monitorResults) > 0 {
 		report += "Monitor Results:\n"
-		for _, value := range monitorResults {
-			report += "- " + value + "\n"
+		for key, value := range monitorResults {
+			report += "- " + key + ": " + value + "\n"
 		}
 	}
 
