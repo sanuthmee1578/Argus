@@ -3,5 +3,6 @@
     "strict_mode": true,
     "blocked_patterns": [
         "os.system"
-    ]
+    ],
+    "memory_limit_mb": 20
 }

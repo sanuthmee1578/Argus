@@ -10,6 +10,8 @@ type Policy struct {
 	StrictMode bool `json:"strict_mode"`
 
 	BlockedPatterns []string `json:"blocked_patterns"`
+
+	MemoryLimitMB int `json:"memory_limit_mb"`
 }
 
 func Load() Policy {
