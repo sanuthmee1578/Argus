@@ -23,8 +23,8 @@ func ReadStatus(pid int) map[string]string {
 	lines := strings.Split(string(data), "\n")
 
 	fieldsToRead := map[string]bool{
-		"State:": true,
-		"VmRSS:": true,
+		"State:":   true,
+		"VmRSS:":   true,
 		"Threads:": true,
 	}
 
@@ -44,26 +44,48 @@ func ReadStatus(pid int) map[string]string {
 	return results
 }
 
-func PollStatus(pid int, interval time.Duration, done <-chan struct{}) map[string]string {
-    ticker := time.NewTicker(interval)
-    defer ticker.Stop()
+func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLimitMB int, memoryExceededChan chan<- struct{}) map[string]string {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
-    peakVmRSS := "0 kB"
+	peakVmRSS := "0 kB"
+	memoryExceeded := false
+	alertSent := false
 
-    for {
-        select {
-        case <-done:
-            return map[string]string{
-                "PeakVmRSS": peakVmRSS,
-            }
+	for {
+		select {
+		case <-done:
+			return map[string]string{
+				"PeakVmRSS":      peakVmRSS,
+				"MemoryExceeded": strconv.FormatBool(memoryExceeded),
+			}
 
-        case <-ticker.C:
-            status := ReadStatus(pid)
-            current := status["VmRSS"]
+		case <-ticker.C:
+			status := ReadStatus(pid)
+			current := status["VmRSS"]
 
-            if current != "" {
-                peakVmRSS = current
-            }
-        }
-    }
+			if current != "" {
+				peakVmRSS = current
+				fields := strings.Fields(current)
+				memory := fields[0]
+				memoryInt, err := strconv.Atoi(memory)
+				if err != nil {
+					fmt.Println("Error converting memory usage:", err)
+					continue
+				}
+
+				if memoryInt > memoryLimitMB*1024 {
+					memoryExceeded = true
+					if !alertSent {
+						memoryExceededChan <- struct{}{}
+						alertSent = true
+					}
+				}
+
+			}
+
+		}
+
+	}
+
 }

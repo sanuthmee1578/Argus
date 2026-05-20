@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func Run(script string, timeout time.Duration) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
+func Run(script string, timeout time.Duration, memoryLimitMB int) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	startTime := time.Now()
@@ -31,15 +31,31 @@ func Run(script string, timeout time.Duration) (string, string, time.Duration, i
 
 	done := make(chan struct{})
 
+	memoryExceededChan := make(chan struct{})
+
 	monitorResultsChan := make(chan map[string]string)
 
 	go func() {
-      monitorResultsChan <- monitor.PollStatus(pid, 100*time.Millisecond, done)
+		monitorResultsChan <- monitor.PollStatus(pid, 100*time.Millisecond, done, memoryLimitMB, memoryExceededChan)
 	}()
 
 	fmt.Println("Script PID:", pid)
 
-	err = cmd.Wait()
+	waitChan := make(chan error)
+
+	go func() {
+		waitChan <- cmd.Wait()
+	}()
+
+	select {
+	case err = <-waitChan:
+		// process finished normally
+
+	case <-memoryExceededChan:
+		// kill process
+		cmd.Process.Kill()
+		err = <-waitChan
+	}
 
 	close(done)
 
@@ -48,6 +64,11 @@ func Run(script string, timeout time.Duration) (string, string, time.Duration, i
 	endTime := time.Now()
 
 	output := outputBuffer.String()
+
+	if monitorResults["MemoryExceeded"] == "true" {
+		fmt.Println("Memory limit exceeded")
+		return "MEMORY_LIMIT_EXCEEDED", output, time.Since(startTime), pid, startTime, endTime, monitorResults
+	}
 
 	if ctx.Err() == context.DeadlineExceeded {
 		fmt.Println("Script execution timed out")

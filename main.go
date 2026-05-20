@@ -33,6 +33,7 @@ func main() {
 	}
 
 	loadPolicy := policy.Load()
+
 	warnings := scanner.Scan(loadPolicy.BlockedPatterns, script)
 
 	// Print the command and script for debugging purposes
@@ -71,7 +72,7 @@ func main() {
 		}
 	}
 	timeout := time.Duration(loadPolicy.Timeout) * time.Second
-	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout)
+	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB)
 	err := logger.Write(script, status, output, warnings, duration, pid, startTime, endTime, monitorResults)
 	if err != nil {
 		fmt.Println("Error writing log:", err)
