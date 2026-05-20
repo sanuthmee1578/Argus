@@ -31,15 +31,31 @@ func Run(script string, timeout time.Duration, memoryLimitMB int) (string, strin
 
 	done := make(chan struct{})
 
+	memoryExceededChan := make(chan struct{})
+
 	monitorResultsChan := make(chan map[string]string)
 
 	go func() {
-		monitorResultsChan <- monitor.PollStatus(pid, 100*time.Millisecond, done, memoryLimitMB)
+		monitorResultsChan <- monitor.PollStatus(pid, 100*time.Millisecond, done, memoryLimitMB, memoryExceededChan)
 	}()
 
 	fmt.Println("Script PID:", pid)
 
-	err = cmd.Wait()
+	waitChan := make(chan error)
+
+	go func() {
+		waitChan <- cmd.Wait()
+	}()
+
+	select {
+	case err = <-waitChan:
+		// process finished normally
+
+	case <-memoryExceededChan:
+		// kill process
+		cmd.Process.Kill()
+		err = <-waitChan
+	}
 
 	close(done)
 

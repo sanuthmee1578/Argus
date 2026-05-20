@@ -44,12 +44,13 @@ func ReadStatus(pid int) map[string]string {
 	return results
 }
 
-func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLimitMB int) map[string]string {
+func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLimitMB int, memoryExceededChan chan<- struct{}) map[string]string {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	peakVmRSS := "0 kB"
 	memoryExceeded := false
+	alertSent := false
 
 	for {
 		select {
@@ -75,6 +76,10 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 
 				if memoryInt > memoryLimitMB*1024 {
 					memoryExceeded = true
+					if !alertSent {
+						memoryExceededChan <- struct{}{}
+						alertSent = true
+					}
 				}
 
 			}
