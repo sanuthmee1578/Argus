@@ -65,13 +65,25 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 			current := status["VmRSS"]
 
 			if current != "" {
-				peakVmRSS = current
 				fields := strings.Fields(current)
 				memory := fields[0]
 				memoryInt, err := strconv.Atoi(memory)
 				if err != nil {
 					fmt.Println("Error converting memory usage:", err)
 					continue
+				}
+
+				peakFields := strings.Fields(peakVmRSS)
+				peakMemory := peakFields[0]
+				peakInt, err := strconv.Atoi(peakMemory)
+
+				if err != nil {
+					fmt.Println("Error converting peak memory usage:", err)
+					continue
+				}
+
+				if memoryInt > peakInt {
+					peakVmRSS = current
 				}
 
 				if memoryInt > memoryLimitMB*1024 {
