@@ -32,7 +32,7 @@ func Write(script string, status string, output string, warnings []string, durat
 		}
 	}
 
-	timestamp := time.Now().Format("2006-01-02T15-04-05")
+	timestamp := time.Now().Format("2006-01-02T15-04-05.000")
 
 	filename := "./reports/run_" + timestamp + "_" + status + ".log"
 
