@@ -47,6 +47,8 @@ func Run(script string, timeout time.Duration, memoryLimitMB int) (string, strin
 		waitChan <- cmd.Wait()
 	}()
 
+	
+
 	select {
 	case err = <-waitChan:
 		// process finished normally
