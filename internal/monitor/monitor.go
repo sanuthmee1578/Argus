@@ -51,6 +51,7 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 	peakVmRSS := "0 kB"
 	memoryExceeded := false
 	alertSent := false
+	childProcesses := []string{}
 
 	for {
 		select {
@@ -58,6 +59,7 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 			return map[string]string{
 				"PeakVmRSS":      peakVmRSS,
 				"MemoryExceeded": strconv.FormatBool(memoryExceeded),
+				"ChildProcesses": strings.Join(childProcesses, ", "),
 			}
 
 		case <-ticker.C:
@@ -96,8 +98,29 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 
 			}
 
+			children := ReadChildren(pid)
+
+			if len(children) > 0 {
+				childProcesses = children
+			}
+
 		}
+
+		
 
 	}
 
+}
+
+func ReadChildren(pid int) []string {
+    children := []string{}
+	path := "/proc/" + strconv.Itoa(pid) + "/task/" + strconv.Itoa(pid) + "/children"
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Println("Error reading child processes:", err)
+		return children
+	}
+	children = strings.Fields(string(data))
+
+    return children
 }
