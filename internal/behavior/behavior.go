@@ -1,3 +1,11 @@
+package behavior
+
+type Analysis struct {
+	Pattern     string
+	Risk        string
+	Intent      string
+	Explanation string
+}
 var behaviorMap = map[string]Analysis{
     "os.system": {
         Pattern: "os.system",

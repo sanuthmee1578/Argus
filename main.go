@@ -5,6 +5,7 @@ import (
 	"argus/internal/policy"
 	"argus/internal/runner"
 	"argus/internal/scanner"
+	"argus/internal/behavior"
 	"fmt"
 	"os"
 	"time"
@@ -35,6 +36,9 @@ func main() {
 	loadPolicy := policy.Load()
 
 	warnings := scanner.Scan(loadPolicy.BlockedPatterns, script)
+
+	analysis := behavior.Analyze(warnings)
+	fmt.Println("Behavior Analysis:", analysis)
 
 	// Print the command and script for debugging purposes
 	fmt.Println("Command:", command)
