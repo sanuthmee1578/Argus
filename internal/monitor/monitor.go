@@ -52,6 +52,7 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 	memoryExceeded := false
 	alertSent := false
 	childProcesses := []string{}
+	suspiciousProcesses := []string{}
 
 	for {
 		select {
@@ -60,6 +61,7 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 				"PeakVmRSS":      peakVmRSS,
 				"MemoryExceeded": strconv.FormatBool(memoryExceeded),
 				"ChildProcesses": strings.Join(childProcesses, ", "),
+				"SuspiciousChildProcesses": strings.Join(suspiciousProcesses, ", "),
 			}
 
 		case <-ticker.C:
@@ -104,10 +106,16 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 				childProcesses = children
 			}
 
+			for _, child := range children {
+				name := ReadProcessName(child)
+				if IsSuspiciousProcess(name) {
+					suspiciousProcesses = append(suspiciousProcesses, name+"(PID:"+child+")")
+				}
 		}
 
 		
-
+	}
+	
 	}
 
 }
@@ -123,4 +131,28 @@ func ReadChildren(pid int) []string {
 	children = strings.Fields(string(data))
 
     return children
+}
+
+func ReadProcessName(pid string) string{
+	path := "/proc/" + pid + "/comm"
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Println("Error reading process name:", err)
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+
+}
+
+func IsSuspiciousProcess(name string) bool{
+	suspiciousProcesses := map[string]bool{
+		"bash": true,
+		"sh": true,
+		"curl": true,
+		"wget": true,
+		"nc": true,
+		"sleep": true,
+    }
+
+	return suspiciousProcesses[name]
 }
