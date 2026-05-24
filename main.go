@@ -38,7 +38,6 @@ func main() {
 	warnings := scanner.Scan(loadPolicy.BlockedPatterns, script)
 
 	analysis := behavior.Analyze(warnings)
-	fmt.Println("Behavior Analysis:", analysis)
 
 	// Print the command and script for debugging purposes
 	fmt.Println("Command:", command)
@@ -47,7 +46,7 @@ func main() {
 	if len(warnings) > 0 {
 		if loadPolicy.StrictMode {
 			fmt.Println("⚠ Strict mode enabled. Execution blocked due to suspicious patterns.")
-			logger.Write(script, "BLOCKED_BY_POLICY", "Script blocked due to strict mode.", warnings, time.Duration(0), 0, time.Time{}, time.Time{}, map[string]string{})
+			logger.Write(script, "BLOCKED_BY_POLICY", "Script blocked due to strict mode.", warnings, time.Duration(0), 0, time.Time{}, time.Time{}, map[string]string{}, analysis)
 			return
 		} else {
 			var choice string
@@ -60,7 +59,7 @@ func main() {
 					fmt.Println("-", warning)
 				}
 
-				err := logger.Write(script, "BLOCKED_BY_USER", "Execution aborted by the user.", warnings, time.Duration(0), 0, time.Time{}, time.Time{}, map[string]string{})
+				err := logger.Write(script, "BLOCKED_BY_USER", "Execution aborted by the user.", warnings, time.Duration(0), 0, time.Time{}, time.Time{}, map[string]string{}, analysis)
 				if err != nil {
 					fmt.Println("Error writing log:", err)
 				}
@@ -77,7 +76,7 @@ func main() {
 	}
 	timeout := time.Duration(loadPolicy.Timeout) * time.Second
 	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB)
-	err := logger.Write(script, status, output, warnings, duration, pid, startTime, endTime, monitorResults)
+	err := logger.Write(script, status, output, warnings, duration, pid, startTime, endTime, monitorResults, analysis)
 	if err != nil {
 		fmt.Println("Error writing log:", err)
 		return

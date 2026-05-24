@@ -4,9 +4,10 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"argus/internal/behavior"
 )
 
-func Write(script string, status string, output string, warnings []string, duration time.Duration, pid int, startTime time.Time, endTime time.Time, monitorResults map[string]string) error {
+func Write(script string, status string, output string, warnings []string, duration time.Duration, pid int, startTime time.Time, endTime time.Time, monitorResults map[string]string, analysis []behavior.Analysis) error {
 	report := "ARGUS EXECUTION REPORT\n"
 	report += "Script: " + script + "\n"
 	report += "Status: " + status + "\n"
@@ -29,6 +30,16 @@ func Write(script string, status string, output string, warnings []string, durat
 		report += "Monitor Results:\n"
 		for key, value := range monitorResults {
 			report += "- " + key + ": " + value + "\n"
+		}
+	}
+
+	if len(analysis) > 0 {
+		report += "Analysis:\n"
+		for _, a := range analysis {
+			report += "- Pattern: " + a.Pattern + "\n"
+			report += "  Risk: " + a.Risk + "\n"
+			report += "  Intent: " + a.Intent + "\n"
+			report += "  Explanation: " + a.Explanation + "\n"
 		}
 	}
 
