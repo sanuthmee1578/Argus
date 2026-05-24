@@ -38,7 +38,6 @@ func main() {
 	warnings := scanner.Scan(loadPolicy.BlockedPatterns, script)
 
 	analysis := behavior.Analyze(warnings)
-	fmt.Println("Behavior Analysis:", analysis)
 
 	// Print the command and script for debugging purposes
 	fmt.Println("Command:", command)
