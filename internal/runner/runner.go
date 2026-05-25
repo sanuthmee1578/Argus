@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"time"
+	"syscall"
 )
 
 func Run(script string, timeout time.Duration, memoryLimitMB int) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
@@ -15,6 +16,10 @@ func Run(script string, timeout time.Duration, memoryLimitMB int) (string, strin
 	startTime := time.Now()
 
 	cmd := exec.CommandContext(ctx, "python3", script)
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
+    }
 
 	var outputBuffer bytes.Buffer
 	cmd.Stdout = &outputBuffer
@@ -55,8 +60,13 @@ func Run(script string, timeout time.Duration, memoryLimitMB int) (string, strin
 
 	case <-memoryExceededChan:
 		// kill process
-		cmd.Process.Kill()
+		syscall.Kill(-pid, syscall.SIGKILL)
 		err = <-waitChan
+
+	case <-ctx.Done():
+    syscall.Kill(-pid, syscall.SIGKILL)
+    err = <-waitChan
+	
 	}
 
 	close(done)
