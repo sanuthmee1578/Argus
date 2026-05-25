@@ -16,7 +16,6 @@ func ReadStatus(pid int) map[string]string {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Println("Error reading process status:", err)
 		return results
 	}
 
@@ -53,6 +52,7 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 	alertSent := false
 	childProcesses := []string{}
 	suspiciousProcesses := []string{}
+	seenSuspicious := map[string]bool{}
 
 	for {
 		select {
@@ -109,7 +109,12 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 			for _, child := range children {
 				name := ReadProcessName(child)
 				if IsSuspiciousProcess(name) {
-					suspiciousProcesses = append(suspiciousProcesses, name+"(PID:"+child+")")
+					label := name + "(PID:" + child + ")"
+
+					if !seenSuspicious[label] {
+						suspiciousProcesses = append(suspiciousProcesses, label)
+						seenSuspicious[label] = true
+					}
 				}
 		}
 
@@ -125,7 +130,6 @@ func ReadChildren(pid int) []string {
 	path := "/proc/" + strconv.Itoa(pid) + "/task/" + strconv.Itoa(pid) + "/children"
 	data, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Println("Error reading child processes:", err)
 		return children
 	}
 	children = strings.Fields(string(data))
@@ -151,7 +155,6 @@ func IsSuspiciousProcess(name string) bool{
 		"curl": true,
 		"wget": true,
 		"nc": true,
-		"sleep": true,
     }
 
 	return suspiciousProcesses[name]
