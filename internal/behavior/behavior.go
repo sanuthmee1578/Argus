@@ -8,10 +8,32 @@ type Analysis struct {
 }
 var behaviorMap = map[string]Analysis{
     "os.system": {
-        Pattern: "os.system",
-        Risk: "HIGH",
-        Intent: "Shell command execution",
+        Risk: "HIGH", Intent: "Shell execution",
         Explanation: "Script may execute arbitrary system commands.",
+    },
+    "subprocess.Popen": {
+        Risk: "HIGH", Intent: "Subprocess abuse",
+        Explanation: "Script spawns external child processes.",
+    },
+    "requests.get": {
+        Risk: "MEDIUM", Intent: "Network call",
+        Explanation: "Script makes outbound HTTP requests.",
+    },
+    "open('/etc/": {
+        Risk: "MEDIUM", Intent: "System file read",
+        Explanation: "Script accesses system configuration files.",
+    },
+    "open('~/.ssh": {
+        Risk: "HIGH", Intent: "Credential harvesting",
+        Explanation: "Script attempts to read SSH keys.",
+    },
+    "socket.connect": {
+        Risk: "HIGH", Intent: "Raw socket",
+        Explanation: "Script opens a direct network connection.",
+    },
+    "rm -rf": {
+        Risk: "HIGH", Intent: "Destructive file operation",
+        Explanation: "Script may delete files recursively.",
     },
 }
 
