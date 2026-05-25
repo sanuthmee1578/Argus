@@ -254,8 +254,6 @@ func IsSuspiciousCommand(command string) bool {
 		"ruby -e",
 		"/bin/bash -c",
 		"/bin/sh -c",
-		"|",      // Piping to shell
-		";",      // Command chaining
 		"curl",   // Download and execute
 		"wget",   // Download and execute
 		"nc ",    // Netcat
