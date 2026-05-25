@@ -16,7 +16,6 @@ func ReadStatus(pid int) map[string]string {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Println("Error reading process status:", err)
 		return results
 	}
 
@@ -52,6 +51,8 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 	memoryExceeded := false
 	alertSent := false
 	childProcesses := []string{}
+	suspiciousProcesses := []string{}
+	seenSuspicious := map[string]bool{}
 
 	for {
 		select {
@@ -60,6 +61,7 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 				"PeakVmRSS":      peakVmRSS,
 				"MemoryExceeded": strconv.FormatBool(memoryExceeded),
 				"ChildProcesses": strings.Join(childProcesses, ", "),
+				"SuspiciousChildProcesses": strings.Join(suspiciousProcesses, ", "),
 			}
 
 		case <-ticker.C:
@@ -104,10 +106,21 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 				childProcesses = children
 			}
 
+			for _, child := range children {
+				name := ReadProcessName(child)
+				if IsSuspiciousProcess(name) {
+					label := name + "(PID:" + child + ")"
+
+					if !seenSuspicious[label] {
+						suspiciousProcesses = append(suspiciousProcesses, label)
+						seenSuspicious[label] = true
+					}
+				}
 		}
 
 		
-
+	}
+	
 	}
 
 }
@@ -117,10 +130,32 @@ func ReadChildren(pid int) []string {
 	path := "/proc/" + strconv.Itoa(pid) + "/task/" + strconv.Itoa(pid) + "/children"
 	data, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Println("Error reading child processes:", err)
 		return children
 	}
 	children = strings.Fields(string(data))
 
     return children
+}
+
+func ReadProcessName(pid string) string{
+	path := "/proc/" + pid + "/comm"
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Println("Error reading process name:", err)
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+
+}
+
+func IsSuspiciousProcess(name string) bool{
+	suspiciousProcesses := map[string]bool{
+		"bash": true,
+		"sh": true,
+		"curl": true,
+		"wget": true,
+		"nc": true,
+    }
+
+	return suspiciousProcesses[name]
 }
