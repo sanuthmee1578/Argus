@@ -68,6 +68,16 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 			var historyList []string
 			for _, child := range childHistory {
 				historyList = append(historyList, child.PID+" "+child.Name+" "+child.Command)
+				
+				// Also check history against suspicious detection for processes that may have exited
+				if IsSuspiciousProcess(child.Name, child.Command) {
+					label := child.Name + "(PID:" + child.PID + ") cmd:" + child.Command
+					
+					if !seenSuspicious[label] {
+						suspiciousProcesses = append(suspiciousProcesses, label)
+						seenSuspicious[label] = true
+					}
+				}
 			}
 
 			return map[string]string{
@@ -121,7 +131,10 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 				for _, child := range childDetails {
 					details = append(details, child.PID+" "+child.Name+" "+child.Command)
 					// Step 2: Track all children ever seen (history)
-					childHistory[child.PID] = child
+					// Only add/update if this PID wasn't seen before, preserving command even after process exits
+					if _, exists := childHistory[child.PID]; !exists {
+						childHistory[child.PID] = child
+					}
 				}
 				childProcesses = details
 			}
