@@ -58,15 +58,40 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 	alertSent := false
 	childProcesses := []string{}
 	suspiciousProcesses := []string{}
-	seenSuspicious := map[string]bool{}
+	seenSuspicious := map[string]bool{}        // Key: PID+Name for stable deduplication
+	suspiciousDetails := map[string]string{}   // Key: PID+Name, Value: full label with command
+	childHistory := map[string]ChildProcessDetails{} // Track all children ever seen
 
 	for {
 		select {
 		case <-done:
+			// Step 2: Include full process history in results
+			var historyList []string
+			for _, child := range childHistory {
+				historyList = append(historyList, child.PID+" "+child.Name+" "+child.Command)
+				
+				// Also check history against suspicious detection for processes that may have exited
+				if IsSuspiciousProcess(child.Name, child.Command) {
+					dedupKey := child.PID + ":" + child.Name
+					
+					if !seenSuspicious[dedupKey] {
+						label := child.Name + "(PID:" + child.PID + ") cmd:" + child.Command
+						suspiciousDetails[dedupKey] = label
+						seenSuspicious[dedupKey] = true
+					}
+				}
+			}
+			
+			// Build final suspicious list from cached details
+			for _, label := range suspiciousDetails {
+				suspiciousProcesses = append(suspiciousProcesses, label)
+			}
+
 			return map[string]string{
 				"PeakVmRSS":      peakVmRSS,
 				"MemoryExceeded": strconv.FormatBool(memoryExceeded),
 				"ChildProcesses": strings.Join(childProcesses, ", "),
+				"ChildHistory":   strings.Join(historyList, " | "),
 				"SuspiciousChildProcesses": strings.Join(suspiciousProcesses, ", "),
 			}
 
@@ -111,18 +136,31 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 			if len(childDetails) > 0 {
 				var details []string
 				for _, child := range childDetails {
-					details = append(details, child.PID+" "+child.Name+" "+child.Command)
+					// Use cached command from history if available (in case process is exiting)
+					command := child.Command
+					if cachedChild, exists := childHistory[child.PID]; exists {
+						command = cachedChild.Command
+					}
+					details = append(details, child.PID+" "+child.Name+" "+command)
+					
+					// Step 2: Track all children ever seen (history)
+					// Only add/update if this PID wasn't seen before, preserving command even after process exits
+					if _, exists := childHistory[child.PID]; !exists {
+						childHistory[child.PID] = child
+					}
 				}
 				childProcesses = details
 			}
 
 			for _, child := range childDetails {
-				if IsSuspiciousProcess(child.Name) {
-					label := child.Name + "(PID:" + child.PID + ")"
-
-					if !seenSuspicious[label] {
-						suspiciousProcesses = append(suspiciousProcesses, label)
-						seenSuspicious[label] = true
+				// Step 3: Check both process name and command pattern for suspicious behavior
+				if IsSuspiciousProcess(child.Name, child.Command) {
+					dedupKey := child.PID + ":" + child.Name // Use PID+Name as stable key
+					
+					if !seenSuspicious[dedupKey] {
+						label := child.Name + "(PID:" + child.PID + ") cmd:" + child.Command
+						suspiciousDetails[dedupKey] = label
+						seenSuspicious[dedupKey] = true
 					}
 				}
 		}
@@ -183,14 +221,54 @@ func ReadChildrenDetails(pid int) []ChildProcessDetails {
 	return details
 }
 
-func IsSuspiciousProcess(name string) bool{
-	suspiciousProcesses := map[string]bool{
+func IsSuspiciousProcess(name string, command string) bool {
+	// Step 3a: Check process name against suspicious list
+	suspiciousNames := map[string]bool{
 		"bash": true,
-		"sh": true,
+		"sh":   true,
 		"curl": true,
 		"wget": true,
-		"nc": true,
-    }
+		"nc":   true,
+	}
 
-	return suspiciousProcesses[name]
+	if suspiciousNames[name] {
+		return true
+	}
+
+	// Step 3b: Check command line for suspicious patterns
+	if IsSuspiciousCommand(command) {
+		return true
+	}
+
+	return false
+}
+
+func IsSuspiciousCommand(command string) bool {
+	// Check for common suspicious command patterns
+	suspiciousPatterns := []string{
+		"bash -c",
+		"sh -c",
+		"python -c",
+		"python3 -c",
+		"perl -e",
+		"ruby -e",
+		"/bin/bash -c",
+		"/bin/sh -c",
+		"|",      // Piping to shell
+		";",      // Command chaining
+		"curl",   // Download and execute
+		"wget",   // Download and execute
+		"nc ",    // Netcat
+		"ncat",   // Netcat
+		"/dev/tcp", // Bash network redirection
+		"/dev/udp", // Bash network redirection
+	}
+
+	for _, pattern := range suspiciousPatterns {
+		if strings.Contains(command, pattern) {
+			return true
+		}
+	}
+
+	return false
 }
