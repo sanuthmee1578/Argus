@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+type ChildProcessDetails struct {
+	PID     string
+	Name    string
+	Command string
+}
+
 func ReadStatus(pid int) map[string]string {
 	results := map[string]string{}
 
@@ -100,16 +106,19 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 
 			}
 
-			children := ReadChildren(pid)
+			childDetails := ReadChildrenDetails(pid)
 
-			if len(children) > 0 {
-				childProcesses = children
+			if len(childDetails) > 0 {
+				var details []string
+				for _, child := range childDetails {
+					details = append(details, child.PID+" "+child.Name+" "+child.Command)
+				}
+				childProcesses = details
 			}
 
-			for _, child := range children {
-				name := ReadProcessName(child)
-				if IsSuspiciousProcess(name) {
-					label := name + "(PID:" + child + ")"
+			for _, child := range childDetails {
+				if IsSuspiciousProcess(child.Name) {
+					label := child.Name + "(PID:" + child.PID + ")"
 
 					if !seenSuspicious[label] {
 						suspiciousProcesses = append(suspiciousProcesses, label)
@@ -137,15 +146,41 @@ func ReadChildren(pid int) []string {
     return children
 }
 
-func ReadProcessName(pid string) string{
+func ReadProcessName(pid string) string {
 	path := "/proc/" + pid + "/comm"
 	data, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Println("Error reading process name:", err)
 		return ""
 	}
 	return strings.TrimSpace(string(data))
+}
 
+func ReadProcessCommand(pid string) string {
+	path := "/proc/" + pid + "/cmdline"
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	// cmdline has null-separated arguments, replace with spaces
+	cmdline := strings.ReplaceAll(string(data), "\x00", " ")
+	return strings.TrimSpace(cmdline)
+}
+
+func ReadChildrenDetails(pid int) []ChildProcessDetails {
+	details := []ChildProcessDetails{}
+	pidStrings := ReadChildren(pid)
+
+	for _, pidStr := range pidStrings {
+		name := ReadProcessName(pidStr)
+		command := ReadProcessCommand(pidStr)
+		details = append(details, ChildProcessDetails{
+			PID:     pidStr,
+			Name:    name,
+			Command: command,
+		})
+	}
+
+	return details
 }
 
 func IsSuspiciousProcess(name string) bool{
