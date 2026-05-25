@@ -75,6 +75,7 @@ func main() {
 		}
 	}
 	timeout := time.Duration(loadPolicy.Timeout) * time.Second
+	fmt.Println("Loaded timeout:", loadPolicy.Timeout)
 	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB)
 	err := logger.Write(script, status, output, warnings, duration, pid, startTime, endTime, monitorResults, analysis)
 	if err != nil {
