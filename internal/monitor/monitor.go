@@ -58,7 +58,8 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 	alertSent := false
 	childProcesses := []string{}
 	suspiciousProcesses := []string{}
-	seenSuspicious := map[string]bool{}
+	seenSuspicious := map[string]bool{}        // Key: PID+Name for stable deduplication
+	suspiciousDetails := map[string]string{}   // Key: PID+Name, Value: full label with command
 	childHistory := map[string]ChildProcessDetails{} // Track all children ever seen
 
 	for {
@@ -71,13 +72,19 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 				
 				// Also check history against suspicious detection for processes that may have exited
 				if IsSuspiciousProcess(child.Name, child.Command) {
-					label := child.Name + "(PID:" + child.PID + ") cmd:" + child.Command
+					dedupKey := child.PID + ":" + child.Name
 					
-					if !seenSuspicious[label] {
-						suspiciousProcesses = append(suspiciousProcesses, label)
-						seenSuspicious[label] = true
+					if !seenSuspicious[dedupKey] {
+						label := child.Name + "(PID:" + child.PID + ") cmd:" + child.Command
+						suspiciousDetails[dedupKey] = label
+						seenSuspicious[dedupKey] = true
 					}
 				}
+			}
+			
+			// Build final suspicious list from cached details
+			for _, label := range suspiciousDetails {
+				suspiciousProcesses = append(suspiciousProcesses, label)
 			}
 
 			return map[string]string{
@@ -129,7 +136,13 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 			if len(childDetails) > 0 {
 				var details []string
 				for _, child := range childDetails {
-					details = append(details, child.PID+" "+child.Name+" "+child.Command)
+					// Use cached command from history if available (in case process is exiting)
+					command := child.Command
+					if cachedChild, exists := childHistory[child.PID]; exists {
+						command = cachedChild.Command
+					}
+					details = append(details, child.PID+" "+child.Name+" "+command)
+					
 					// Step 2: Track all children ever seen (history)
 					// Only add/update if this PID wasn't seen before, preserving command even after process exits
 					if _, exists := childHistory[child.PID]; !exists {
@@ -142,11 +155,12 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 			for _, child := range childDetails {
 				// Step 3: Check both process name and command pattern for suspicious behavior
 				if IsSuspiciousProcess(child.Name, child.Command) {
-					label := child.Name + "(PID:" + child.PID + ") cmd:" + child.Command
-
-					if !seenSuspicious[label] {
-						suspiciousProcesses = append(suspiciousProcesses, label)
-						seenSuspicious[label] = true
+					dedupKey := child.PID + ":" + child.Name // Use PID+Name as stable key
+					
+					if !seenSuspicious[dedupKey] {
+						label := child.Name + "(PID:" + child.PID + ") cmd:" + child.Command
+						suspiciousDetails[dedupKey] = label
+						seenSuspicious[dedupKey] = true
 					}
 				}
 		}
