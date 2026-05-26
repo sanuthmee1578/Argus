@@ -6,12 +6,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"syscall"
 	"time"
 )
 
-func Run(script string, timeout time.Duration, memoryLimitMB int) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
+func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bool) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	startTime := time.Now()
@@ -29,6 +30,12 @@ func Run(script string, timeout time.Duration, memoryLimitMB int) (string, strin
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
+	}
+
+	if !keepSandbox {
+		defer os.RemoveAll(prepared.Path)
+	} else {
+		fmt.Println("Sandbox kept at:", prepared.Path)
 	}
 
 	var outputBuffer bytes.Buffer
