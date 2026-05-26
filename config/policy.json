@@ -10,5 +10,5 @@
         "socket.connect",
         "rm -rf"
     ],
-    "memory_limit_mb": 20
+    "memory_limit_mb": 100
 }

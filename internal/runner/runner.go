@@ -2,12 +2,13 @@ package runner
 
 import (
 	"argus/internal/monitor"
+	"argus/internal/sandbox"
 	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
-	"time"
 	"syscall"
+	"time"
 )
 
 func Run(script string, timeout time.Duration, memoryLimitMB int) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
@@ -15,17 +16,26 @@ func Run(script string, timeout time.Duration, memoryLimitMB int) (string, strin
 	defer cancel()
 	startTime := time.Now()
 
-	cmd := exec.CommandContext(ctx, "python3", script)
+	prepared, err := sandbox.PrepareSandbox(script)
+	if err != nil {
+		fmt.Println("Error preparing sandbox:", err)
+		endTime := time.Now()
+		return "ERROR", "", time.Since(startTime), 0, startTime, endTime, map[string]string{}
+	}
+
+	cmd := exec.CommandContext(ctx, "python3", prepared.ScriptName)
+
+	cmd.Dir = prepared.Path
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
-    }
+	}
 
 	var outputBuffer bytes.Buffer
 	cmd.Stdout = &outputBuffer
 	cmd.Stderr = &outputBuffer
 
-	err := cmd.Start()
+	err = cmd.Start()
 	if err != nil {
 		fmt.Println("Error starting Script:", err)
 		endTime := time.Now()
@@ -52,8 +62,6 @@ func Run(script string, timeout time.Duration, memoryLimitMB int) (string, strin
 		waitChan <- cmd.Wait()
 	}()
 
-	
-
 	select {
 	case err = <-waitChan:
 		// process finished normally
@@ -64,9 +72,9 @@ func Run(script string, timeout time.Duration, memoryLimitMB int) (string, strin
 		err = <-waitChan
 
 	case <-ctx.Done():
-    syscall.Kill(-pid, syscall.SIGKILL)
-    err = <-waitChan
-	
+		syscall.Kill(-pid, syscall.SIGKILL)
+		err = <-waitChan
+
 	}
 
 	close(done)
