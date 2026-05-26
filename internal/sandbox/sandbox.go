@@ -1,6 +1,7 @@
 package sandbox
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -21,8 +22,36 @@ func PrepareSandbox(scriptPath string) (PreparedSandbox, error) {
 
 	scriptName := filepath.Base(scriptPath)
 
+	sandboxScriptPath := filepath.Join(sandboxPath, scriptName)
+
+	err = CopyScript(scriptPath, sandboxScriptPath)
+
+	if err != nil {
+		return PreparedSandbox{}, err
+	}
+
 	return PreparedSandbox{
 		Path:       sandboxPath,
 		ScriptName: scriptName,
 	}, nil
+}
+
+func CopyScript(src string, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destinationFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destinationFile.Close()
+
+	_, err = io.Copy(destinationFile, sourceFile)
+	if err != nil {
+		return err
+	}
+	return nil
 }
