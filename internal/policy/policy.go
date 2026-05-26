@@ -12,6 +12,8 @@ type Policy struct {
 	BlockedPatterns []string `json:"blocked_patterns"`
 
 	MemoryLimitMB int `json:"memory_limit_mb"`
+
+	KeepSandbox bool `json:"keep_sandbox"`
 }
 
 func Load() Policy {

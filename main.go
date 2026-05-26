@@ -1,11 +1,11 @@
 package main
 
 import (
+	"argus/internal/behavior"
 	"argus/internal/logger"
 	"argus/internal/policy"
 	"argus/internal/runner"
 	"argus/internal/scanner"
-	"argus/internal/behavior"
 	"fmt"
 	"os"
 	"time"
@@ -76,7 +76,7 @@ func main() {
 	}
 	timeout := time.Duration(loadPolicy.Timeout) * time.Second
 	fmt.Println("Loaded timeout:", loadPolicy.Timeout)
-	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB)
+	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB, loadPolicy.KeepSandbox)
 	err := logger.Write(script, status, output, warnings, duration, pid, startTime, endTime, monitorResults, analysis)
 	if err != nil {
 		fmt.Println("Error writing log:", err)

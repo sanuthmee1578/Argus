@@ -10,5 +10,6 @@
         "socket.connect",
         "rm -rf"
     ],
-    "memory_limit_mb": 100
+    "memory_limit_mb": 100,
+    "keep_sandbox": true
 }
