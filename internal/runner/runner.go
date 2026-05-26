@@ -17,6 +17,8 @@ func Run(script string, timeout time.Duration, memoryLimitMB int) (string, strin
 
 	cmd := exec.CommandContext(ctx, "python3", script)
 
+	cmd.Dir = "sandbox/test1"
+
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
     }
