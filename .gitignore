@@ -4,6 +4,8 @@ logs/*
 reports/*
 !reports/.gitkeep
 
+/sandbox/
+
 argus
 
 *.exe
