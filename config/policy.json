@@ -8,7 +8,12 @@
         "open('/etc/",
         "open('~/.ssh",
         "socket.connect",
-        "rm -rf"
+        "rm -rf",
+        "/etc/",
+        "/home/",
+        "~/.ssh",
+        ".env",
+        "id_rsa"
     ],
     "memory_limit_mb": 100,
     "keep_sandbox": true
