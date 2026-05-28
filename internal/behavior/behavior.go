@@ -6,6 +6,7 @@ type Analysis struct {
 	Intent      string
 	Explanation string
 }
+
 var behaviorMap = map[string]Analysis{
 	"os.system": {
 		Pattern:     "os.system",
@@ -48,6 +49,36 @@ var behaviorMap = map[string]Analysis{
 		Risk:        "HIGH",
 		Intent:      "Destructive file operation",
 		Explanation: "Script may delete files recursively.",
+	},
+	"/etc/": {
+		Pattern:     "/etc/",
+		Risk:        "MEDIUM",
+		Intent:      "System file access",
+		Explanation: "Script accesses system configuration files.",
+	},
+	"/home/": {
+		Pattern:     "/home/",
+		Risk:        "MEDIUM",
+		Intent:      "User file access",
+		Explanation: "Script accesses user files.",
+	},
+	"~/.ssh": {
+		Pattern:     "~/.ssh",
+		Risk:        "HIGH",
+		Intent:      "Credential harvesting",
+		Explanation: "Script attempts to read SSH keys.",
+	},
+	".env": {
+		Pattern:     ".env",
+		Risk:        "HIGH",
+		Intent:      "Environment variable access",
+		Explanation: "Script attempts to read environment variables.",
+	},
+	"id_rsa": {
+		Pattern:     "id_rsa",
+		Risk:        "HIGH",
+		Intent:      "Credential harvesting",
+		Explanation: "Script attempts to read private SSH keys.",
 	},
 }
 
