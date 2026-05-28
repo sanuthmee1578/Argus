@@ -76,7 +76,9 @@ func main() {
 	}
 	timeout := time.Duration(loadPolicy.Timeout) * time.Second
 	fmt.Println("Loaded timeout:", loadPolicy.Timeout)
-	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB, loadPolicy.KeepSandbox)
+	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB, loadPolicy.KeepSandbox, loadPolicy.RootfsPath, loadPolicy.EnableChroot)
+	fmt.Println("Chroot enabled:", loadPolicy.EnableChroot)
+	fmt.Println("Rootfs path:", loadPolicy.RootfsPath)
 	err := logger.Write(script, status, output, warnings, duration, pid, startTime, endTime, monitorResults, analysis)
 	if err != nil {
 		fmt.Println("Error writing log:", err)

@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bool) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
+func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bool, rootfsPath string, enableChroot bool) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	startTime := time.Now()
