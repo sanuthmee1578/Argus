@@ -30,6 +30,11 @@ func PrepareSandbox(scriptPath string) (PreparedSandbox, error) {
 		return PreparedSandbox{}, err
 	}
 
+	err = os.Chmod(sandboxScriptPath, 0444)
+	if err != nil {
+		return PreparedSandbox{}, err
+	}
+
 	return PreparedSandbox{
 		Path:       sandboxPath,
 		ScriptName: scriptName,
