@@ -8,13 +8,20 @@ import (
 )
 
 type PreparedSandbox struct {
-	Path       string
-	ScriptName string
+	HostPath    string
+	RuntimePath string
+	ScriptName  string
 }
 
-func PrepareSandbox(scriptPath string) (PreparedSandbox, error) {
+func PrepareSandbox(scriptPath string, enableChroot bool, rootfsPath string) (PreparedSandbox, error) {
+	var sandboxPath string
 	timeStamp := time.Now().Format("2006-01-02T15-04-05.000")
-	sandboxPath := filepath.Join("sandbox", "run-"+timeStamp)
+	if enableChroot {
+		sandboxPath = filepath.Join(rootfsPath, "sandbox", "run-"+timeStamp)
+	} else {
+		sandboxPath = filepath.Join("sandbox", "run-"+timeStamp)
+	}
+
 	err := os.MkdirAll(sandboxPath, 0755)
 	if err != nil {
 		return PreparedSandbox{}, err
@@ -35,10 +42,19 @@ func PrepareSandbox(scriptPath string) (PreparedSandbox, error) {
 		return PreparedSandbox{}, err
 	}
 
-	return PreparedSandbox{
-		Path:       sandboxPath,
-		ScriptName: scriptName,
-	}, nil
+	if enableChroot {
+		return PreparedSandbox{
+			HostPath:    sandboxPath,
+			RuntimePath: filepath.Join("/sandbox", "run-"+timeStamp),
+			ScriptName:  scriptName,
+		}, nil
+	} else {
+		return PreparedSandbox{
+			HostPath:    sandboxPath,
+			RuntimePath: sandboxPath,
+			ScriptName:  scriptName,
+		}, nil
+	}
 }
 
 func CopyScript(src string, dst string) error {

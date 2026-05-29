@@ -16,5 +16,7 @@
         "id_rsa"
     ],
     "memory_limit_mb": 100,
-    "keep_sandbox": true
+    "keep_sandbox": true,
+    "rootfs_path": "/tmp/argus-root",
+    "enable_chroot": false
 }
