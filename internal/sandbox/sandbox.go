@@ -19,7 +19,7 @@ func PrepareSandbox(scriptPath string, enableChroot bool, rootfsPath string) (Pr
 	if enableChroot {
 		sandboxPath = filepath.Join(rootfsPath, "sandbox", "run-"+timeStamp)
 	} else {
-		sandboxPath = filepath.Join("sandbox", "run-"+timeStamp)
+		sandboxPath = filepath.Join(os.TempDir(), "argus", "run-"+timeStamp)
 	}
 
 	err := os.MkdirAll(sandboxPath, 0755)
