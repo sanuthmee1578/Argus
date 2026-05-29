@@ -77,6 +77,11 @@ func main() {
 	}
 
 	if loadPolicy.EnableChroot {
+		if os.Geteuid() != 0 {
+			fmt.Println("Chroot mode requires root privileges. Run with sudo or disable enable_chroot.")
+			return
+		}
+
 		missing := rootfs.Validate(loadPolicy.RootfsPath)
 
 		if len(missing) > 0 {
@@ -91,10 +96,7 @@ func main() {
 	}
 
 	timeout := time.Duration(loadPolicy.Timeout) * time.Second
-	fmt.Println("Loaded timeout:", loadPolicy.Timeout)
 	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB, loadPolicy.KeepSandbox, loadPolicy.RootfsPath, loadPolicy.EnableChroot)
-	fmt.Println("Chroot enabled:", loadPolicy.EnableChroot)
-	fmt.Println("Rootfs path:", loadPolicy.RootfsPath)
 	err := logger.Write(script, status, output, warnings, duration, pid, startTime, endTime, monitorResults, analysis)
 	if err != nil {
 		fmt.Println("Error writing log:", err)

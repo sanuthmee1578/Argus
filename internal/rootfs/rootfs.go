@@ -11,7 +11,6 @@ func Validate(rootfsPath string) []string {
 	requiredPaths := map[string]string{
 		"/usr/bin/python3":            "Python interpreter",
 		"/dev/null":                   "Required device file for process execution",
-		"/usr/lib/python3.12":         "Python standard library",
 		"/lib64/ld-linux-x86-64.so.2": "Dynamic loader",
 	}
 
@@ -20,6 +19,11 @@ func Validate(rootfsPath string) []string {
 		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			missing = append(missing, path+" missing: "+description)
 		}
+	}
+
+	pythonStdlibMatches, err := filepath.Glob(filepath.Join(rootfsPath, "usr/lib/python3.*"))
+	if err != nil || len(pythonStdlibMatches) == 0 {
+		missing = append(missing, "/usr/lib/python3.x missing: Python standard library")
 	}
 
 	return missing
