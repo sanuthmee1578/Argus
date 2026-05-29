@@ -8,13 +8,15 @@ import (
 )
 
 type PreparedSandbox struct {
-	Path       string
-	ScriptName string
+	HostPath    string
+	RuntimePath string
+	ScriptName  string
 }
 
 func PrepareSandbox(scriptPath string) (PreparedSandbox, error) {
 	timeStamp := time.Now().Format("2006-01-02T15-04-05.000")
 	sandboxPath := filepath.Join("sandbox", "run-"+timeStamp)
+
 	err := os.MkdirAll(sandboxPath, 0755)
 	if err != nil {
 		return PreparedSandbox{}, err
@@ -36,8 +38,9 @@ func PrepareSandbox(scriptPath string) (PreparedSandbox, error) {
 	}
 
 	return PreparedSandbox{
-		Path:       sandboxPath,
-		ScriptName: scriptName,
+		HostPath:    sandboxPath,
+		RuntimePath: sandboxPath,
+		ScriptName:  scriptName,
 	}, nil
 }
 

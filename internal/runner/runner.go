@@ -26,16 +26,16 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 
 	cmd := exec.CommandContext(ctx, "python3", prepared.ScriptName)
 
-	cmd.Dir = prepared.Path
+	cmd.Dir = prepared.RuntimePath
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
 
 	if !keepSandbox {
-		defer os.RemoveAll(prepared.Path)
+		defer os.RemoveAll(prepared.HostPath)
 	} else {
-		fmt.Println("Sandbox kept at:", prepared.Path)
+		fmt.Println("Sandbox kept at:", prepared.HostPath)
 	}
 
 	var outputBuffer bytes.Buffer
