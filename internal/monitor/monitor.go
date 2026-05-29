@@ -58,8 +58,8 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 	alertSent := false
 	childProcesses := []string{}
 	suspiciousProcesses := []string{}
-	seenSuspicious := map[string]bool{}        // Key: PID+Name for stable deduplication
-	suspiciousDetails := map[string]string{}   // Key: PID+Name, Value: full label with command
+	seenSuspicious := map[string]bool{}              // Key: PID+Name for stable deduplication
+	suspiciousDetails := map[string]string{}         // Key: PID+Name, Value: full label with command
 	childHistory := map[string]ChildProcessDetails{} // Track all children ever seen
 
 	for {
@@ -69,11 +69,11 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 			var historyList []string
 			for _, child := range childHistory {
 				historyList = append(historyList, child.PID+" "+child.Name+" "+child.Command)
-				
+
 				// Also check history against suspicious detection for processes that may have exited
 				if IsSuspiciousProcess(child.Name, child.Command) {
 					dedupKey := child.PID + ":" + child.Name
-					
+
 					if !seenSuspicious[dedupKey] {
 						label := child.Name + "(PID:" + child.PID + ") cmd:" + child.Command
 						suspiciousDetails[dedupKey] = label
@@ -81,17 +81,17 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 					}
 				}
 			}
-			
+
 			// Build final suspicious list from cached details
 			for _, label := range suspiciousDetails {
 				suspiciousProcesses = append(suspiciousProcesses, label)
 			}
 
 			return map[string]string{
-				"PeakVmRSS":      peakVmRSS,
-				"MemoryExceeded": strconv.FormatBool(memoryExceeded),
-				"ChildProcesses": strings.Join(childProcesses, ", "),
-				"ChildHistory":   strings.Join(historyList, " | "),
+				"PeakVmRSS":                peakVmRSS,
+				"MemoryExceeded":           strconv.FormatBool(memoryExceeded),
+				"ChildProcesses":           strings.Join(childProcesses, ", "),
+				"ChildHistory":             strings.Join(historyList, " | "),
 				"SuspiciousChildProcesses": strings.Join(suspiciousProcesses, ", "),
 			}
 
@@ -142,7 +142,7 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 						command = cachedChild.Command
 					}
 					details = append(details, child.PID+" "+child.Name+" "+command)
-					
+
 					// Step 2: Track all children ever seen (history)
 					// Only add/update if this PID wasn't seen before, preserving command even after process exits
 					if _, exists := childHistory[child.PID]; !exists {
@@ -156,24 +156,23 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 				// Step 3: Check both process name and command pattern for suspicious behavior
 				if IsSuspiciousProcess(child.Name, child.Command) {
 					dedupKey := child.PID + ":" + child.Name // Use PID+Name as stable key
-					
+
 					if !seenSuspicious[dedupKey] {
 						label := child.Name + "(PID:" + child.PID + ") cmd:" + child.Command
 						suspiciousDetails[dedupKey] = label
 						seenSuspicious[dedupKey] = true
 					}
 				}
+			}
+
 		}
 
-		
-	}
-	
 	}
 
 }
 
 func ReadChildren(pid int) []string {
-    children := []string{}
+	children := []string{}
 	path := "/proc/" + strconv.Itoa(pid) + "/task/" + strconv.Itoa(pid) + "/children"
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -181,7 +180,7 @@ func ReadChildren(pid int) []string {
 	}
 	children = strings.Fields(string(data))
 
-    return children
+	return children
 }
 
 func ReadProcessName(pid string) string {
@@ -254,10 +253,10 @@ func IsSuspiciousCommand(command string) bool {
 		"ruby -e",
 		"/bin/bash -c",
 		"/bin/sh -c",
-		"curl",   // Download and execute
-		"wget",   // Download and execute
-		"nc ",    // Netcat
-		"ncat",   // Netcat
+		"curl",     // Download and execute
+		"wget",     // Download and execute
+		"nc ",      // Netcat
+		"ncat",     // Netcat
 		"/dev/tcp", // Bash network redirection
 		"/dev/udp", // Bash network redirection
 	}
