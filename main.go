@@ -4,6 +4,7 @@ import (
 	"argus/internal/behavior"
 	"argus/internal/logger"
 	"argus/internal/policy"
+	"argus/internal/rootfs"
 	"argus/internal/runner"
 	"argus/internal/scanner"
 	"fmt"
@@ -74,6 +75,21 @@ func main() {
 			}
 		}
 	}
+
+	if loadPolicy.EnableChroot {
+		missing := rootfs.Validate(loadPolicy.RootfsPath)
+
+		if len(missing) > 0 {
+			fmt.Println("Rootfs validation failed:")
+
+			for _, issue := range missing {
+				fmt.Println("-", issue)
+			}
+
+			return
+		}
+	}
+
 	timeout := time.Duration(loadPolicy.Timeout) * time.Second
 	fmt.Println("Loaded timeout:", loadPolicy.Timeout)
 	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB, loadPolicy.KeepSandbox, loadPolicy.RootfsPath, loadPolicy.EnableChroot)

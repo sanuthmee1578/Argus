@@ -1,10 +1,10 @@
 package logger
 
 import (
+	"argus/internal/behavior"
 	"os"
 	"strconv"
 	"time"
-	"argus/internal/behavior"
 )
 
 func Write(script string, status string, output string, warnings []string, duration time.Duration, pid int, startTime time.Time, endTime time.Time, monitorResults map[string]string, analysis []behavior.Analysis) error {
