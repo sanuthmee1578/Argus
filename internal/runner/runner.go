@@ -17,19 +17,28 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 	defer cancel()
 	startTime := time.Now()
 
-	prepared, err := sandbox.PrepareSandbox(script)
+	prepared, err := sandbox.PrepareSandbox(script, enableChroot, rootfsPath)
 	if err != nil {
 		fmt.Println("Error preparing sandbox:", err)
 		endTime := time.Now()
 		return "ERROR", "", time.Since(startTime), 0, startTime, endTime, map[string]string{}
 	}
 
-	cmd := exec.CommandContext(ctx, "python3", prepared.ScriptName)
+	var cmd *exec.Cmd
 
-	cmd.Dir = prepared.RuntimePath
-
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
+	if enableChroot {
+		cmd = exec.CommandContext(ctx, "/usr/bin/python3", prepared.ScriptName)
+		cmd.Dir = prepared.RuntimePath
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setpgid: true,
+			Chroot:  rootfsPath,
+		}
+	} else {
+		cmd = exec.CommandContext(ctx, "python3", prepared.ScriptName)
+		cmd.Dir = prepared.RuntimePath
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setpgid: true,
+		}
 	}
 
 	if !keepSandbox {
