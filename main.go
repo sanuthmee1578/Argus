@@ -14,20 +14,28 @@ import (
 
 func main() {
 
-	// Check if enough arguments are provided
-	if len(os.Args) < 3 {
+	if len(os.Args) < 2 {
 		fmt.Println("Usage: argus run <script>")
 		return
 	}
 
-	// Extract the command and script from the arguments
 	command := os.Args[1]
-	script := os.Args[2]
+	if command == "setup-rootfs" {
+		setupRootfs()
+		return
+	}
 
 	if command != "run" {
 		fmt.Println("Unknown command:", command)
 		return
 	}
+
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: argus run <script>")
+		return
+	}
+
+	script := os.Args[2]
 
 	if _, err := os.Stat(script); os.IsNotExist(err) {
 		fmt.Println("Script not found:", script)
@@ -105,4 +113,19 @@ func main() {
 	fmt.Println("Status:", status)
 	fmt.Println("Output:", output)
 	fmt.Printf("Execution time: %v\n", duration)
+}
+
+func setupRootfs() {
+	if os.Geteuid() != 0 {
+		fmt.Println("Root privileges are required to set up the rootfs. Run with sudo.")
+		return
+	}
+
+	loadPolicy := policy.Load()
+	if err := rootfs.Setup(loadPolicy.RootfsPath); err != nil {
+		fmt.Println("Error setting up rootfs:", err)
+		return
+	}
+
+	fmt.Println("Rootfs setup completed:", loadPolicy.RootfsPath)
 }
