@@ -1,6 +1,7 @@
 package rootfs
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -28,4 +29,49 @@ func Validate(rootfsPath string) []string {
 
 	return missing
 
+}
+
+func Setup(rootfsPath string) error {
+	// Create necessary directories
+	dirs := []string{
+		"usr/bin",
+		"dev",
+		"lib/x86_64-linux-gnu",
+		"lib64",
+		"usr/lib",
+	}
+
+	for _, dir := range dirs {
+		if err := os.MkdirAll(filepath.Join(rootfsPath, dir), 0755); err != nil {
+			return err
+		}
+	}
+
+	pythonDst := filepath.Join(rootfsPath, "usr/bin/python3")
+	err := copyFile("/usr/bin/python3", pythonDst)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func copyFile(src string, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return err
+	}
+	return nil
 }
