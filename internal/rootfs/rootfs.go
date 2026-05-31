@@ -58,6 +58,14 @@ func Setup(rootfsPath string) error {
 		return err
 	}
 
+	pythonStdlibSrc := "/usr/lib/python3.12"
+	pythonStdlibDst := filepath.Join(rootfsPath, "usr/lib/python3.12")
+
+	err = copyDir(pythonStdlibSrc, pythonStdlibDst)
+	if err != nil {
+		return err
+	}
+
 	devNullPath := filepath.Join(rootfsPath, "dev/null")
 
 	err = os.WriteFile(devNullPath, []byte{}, 0666)
@@ -108,5 +116,36 @@ func copyLibraries(rootfsPath string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func copyDir(src string, dst string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	err = os.MkdirAll(dst, 0755)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			err = copyDir(srcPath, dstPath)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = copyFile(srcPath, dstPath)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
