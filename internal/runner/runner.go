@@ -30,8 +30,9 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 		cmd = exec.CommandContext(ctx, "/usr/bin/python3", prepared.ScriptName)
 		cmd.Dir = prepared.RuntimePath
 		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Setpgid: true,
-			Chroot:  rootfsPath,
+			Setpgid:    true,
+			Chroot:     rootfsPath,
+			Cloneflags: syscall.CLONE_NEWNS,
 		}
 	} else {
 		cmd = exec.CommandContext(ctx, "python3", prepared.ScriptName)
