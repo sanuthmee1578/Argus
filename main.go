@@ -15,13 +15,24 @@ import (
 func main() {
 
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: argus run <script>")
+		fmt.Println("Usage: argus <command>")
 		return
 	}
-
 	command := os.Args[1]
 	if command == "setup-rootfs" {
-		setupRootfs()
+		loadPolicy := policy.Load()
+
+		if os.Geteuid() != 0 {
+			fmt.Println("Rootfs setup requires root privileges. Run with sudo.")
+			return
+		}
+
+		err := rootfs.Setup(loadPolicy.RootfsPath)
+		if err != nil {
+			fmt.Println("Error setting up rootfs:", err)
+			return
+		}
+		fmt.Println("Rootfs setup completed successfully.")
 		return
 	}
 
@@ -29,12 +40,12 @@ func main() {
 		fmt.Println("Unknown command:", command)
 		return
 	}
-
+	// Check if enough arguments are provided
 	if len(os.Args) < 3 {
 		fmt.Println("Usage: argus run <script>")
 		return
 	}
-
+    // Extract the script from the arguments
 	script := os.Args[2]
 
 	if _, err := os.Stat(script); os.IsNotExist(err) {
@@ -115,17 +126,4 @@ func main() {
 	fmt.Printf("Execution time: %v\n", duration)
 }
 
-func setupRootfs() {
-	if os.Geteuid() != 0 {
-		fmt.Println("Root privileges are required to set up the rootfs. Run with sudo.")
-		return
-	}
 
-	loadPolicy := policy.Load()
-	if err := rootfs.Setup(loadPolicy.RootfsPath); err != nil {
-		fmt.Println("Error setting up rootfs:", err)
-		return
-	}
-
-	fmt.Println("Rootfs setup completed:", loadPolicy.RootfsPath)
-}
