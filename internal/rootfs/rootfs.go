@@ -53,6 +53,11 @@ func Setup(rootfsPath string) error {
 		return err
 	}
 
+	err = copyLibraries(rootfsPath)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -72,6 +77,29 @@ func copyFile(src string, dst string) error {
 	_, err = io.Copy(destFile, sourceFile)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func copyLibraries(rootfsPath string) error {
+	lib := []string{
+		"/lib/x86_64-linux-gnu/libm.so.6",
+		"/lib/x86_64-linux-gnu/libz.so.1",
+		"/lib/x86_64-linux-gnu/libexpat.so.1",
+		"/lib/x86_64-linux-gnu/libc.so.6",
+		"/lib64/ld-linux-x86-64.so.2",
+	}
+
+	for _, libPath := range lib {
+		dst := filepath.Join(rootfsPath, libPath[1:])
+		err := os.MkdirAll(filepath.Dir(dst), 0755)
+		if err != nil {
+			return err
+		}
+		err = copyFile(libPath, dst)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
