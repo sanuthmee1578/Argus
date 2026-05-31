@@ -58,6 +58,13 @@ func Setup(rootfsPath string) error {
 		return err
 	}
 
+	devNullPath := filepath.Join(rootfsPath, "dev/null")
+
+	err = os.WriteFile(devNullPath, []byte{}, 0666)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
