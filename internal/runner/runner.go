@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"argus/internal/cgroup"
 	"argus/internal/monitor"
 	"argus/internal/sandbox"
 	"bytes"
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -52,6 +54,16 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 	cmd.Stdout = &outputBuffer
 	cmd.Stderr = &outputBuffer
 
+	runID := strconv.FormatInt(time.Now().UnixNano(), 10)
+
+	cgroupPath, err := cgroup.Create(runID, memoryLimitMB)
+
+	if err != nil {
+		fmt.Println("Error creating cgroup:", err)
+		endTime := time.Now()
+		return "ERROR", "", time.Since(startTime), 0, startTime, endTime, map[string]string{}
+	}
+
 	err = cmd.Start()
 	if err != nil {
 		fmt.Println("Error starting Script:", err)
@@ -72,6 +84,14 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 	}()
 
 	fmt.Println("Script PID:", pid)
+
+	err = cgroup.Attach(cgroupPath, pid)
+	if err != nil {
+		fmt.Println("Error attaching to cgroup:", err)
+		syscall.Kill(-pid, syscall.SIGKILL)
+		endTime := time.Now()
+		return "ERROR", "", time.Since(startTime), pid, startTime, endTime, map[string]string{}
+	}
 
 	waitChan := make(chan error)
 

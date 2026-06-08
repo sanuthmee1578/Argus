@@ -24,3 +24,8 @@ func Create(runID string, memoryLimitMB int) (string, error) {
 
 	return cgroupPath, nil
 }
+
+func Attach(cgroupPath string, pid int) error {
+	cgroupProcsPath := filepath.Join(cgroupPath, "cgroup.procs")
+	return os.WriteFile(cgroupProcsPath, []byte(strconv.Itoa(pid)), 0644)
+}
