@@ -64,6 +64,12 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 		return "ERROR", "", time.Since(startTime), 0, startTime, endTime, map[string]string{}
 	}
 
+	defer func() {
+		if err := cgroup.Cleanup(cgroupPath); err != nil {
+			fmt.Println("Error cleaning up cgroup:", err)
+		}
+	}()
+
 	err = cmd.Start()
 	if err != nil {
 		fmt.Println("Error starting Script:", err)

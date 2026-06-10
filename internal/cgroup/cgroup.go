@@ -22,10 +22,20 @@ func Create(runID string, memoryLimitMB int) (string, error) {
 		return "", err
 	}
 
+	pidsMaxPath := filepath.Join(cgroupPath, "pids.max")
+	err = os.WriteFile(pidsMaxPath, []byte("20"), 0644)
+	if err != nil {
+		return "", err
+	}
+
 	return cgroupPath, nil
 }
 
 func Attach(cgroupPath string, pid int) error {
 	cgroupProcsPath := filepath.Join(cgroupPath, "cgroup.procs")
 	return os.WriteFile(cgroupProcsPath, []byte(strconv.Itoa(pid)), 0644)
+}
+
+func Cleanup(cgroupPath string) error {
+	return os.Remove(cgroupPath)
 }
