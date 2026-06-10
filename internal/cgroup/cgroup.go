@@ -28,6 +28,13 @@ func Create(runID string, memoryLimitMB int) (string, error) {
 		return "", err
 	}
 
+	cpuMaxPath := filepath.Join(cgroupPath, "cpu.max")
+	err = os.WriteFile(cpuMaxPath, []byte("50000 100000"), 0644)
+
+	if err != nil {
+		return "", err
+	}
+
 	return cgroupPath, nil
 }
 
