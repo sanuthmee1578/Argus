@@ -10,5 +10,10 @@ func ApplyDefaultProfile() error {
 		return err
 	}
 
+	mountSyscall, err := libseccomp.GetSyscallFromName("mount")
+	if err != nil {
+		return err
+	}
+
 	return filter.Load()
 }
