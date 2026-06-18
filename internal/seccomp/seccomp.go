@@ -15,5 +15,10 @@ func ApplyDefaultProfile() error {
 		return err
 	}
 
+	err = filter.AddRule(mountSyscall, libseccomp.ActKill)
+	if err != nil {
+		return err
+	}
+
 	return filter.Load()
 }
