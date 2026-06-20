@@ -5,6 +5,7 @@ reports/*
 !reports/.gitkeep
 
 /sandbox/
+/bin/
 
 argus
 
