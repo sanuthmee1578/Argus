@@ -37,6 +37,13 @@ func main() {
 			fmt.Println("Failed to apply strict seccomp profile:", err)
 			os.Exit(1)
 		}
+
+	} else if profile == "no-network" {
+		err := seccomp.ApplyNoNetworkProfile()
+		if err != nil {
+			fmt.Println("Failed to apply no-network seccomp profile:", err)
+			os.Exit(1)
+		}
 	} else if profile == "none" {
 		fmt.Println("Seccomp disabled")
 	} else {

@@ -6,21 +6,44 @@ import (
 	libseccomp "github.com/seccomp/libseccomp-golang"
 )
 
+func ApplyNoNetworkProfile() error {
+	return applyProfile(
+		libseccomp.ActErrno.SetReturnCode(int16(syscall.EPERM)),
+		[]string{
+			"reboot",
+			"mount",
+			"umount2",
+			"ptrace",
+			"setns",
+			"unshare",
+			"kexec_load",
+			"socket",
+			"connect",
+			"accept",
+			"bind",
+			"listen",
+			"sendto",
+			"recvfrom",
+		},
+	)
+}
+
 func ApplyDefaultProfile() error {
-	return applyProfile(libseccomp.ActErrno.SetReturnCode(int16(syscall.EPERM)))
+	return applyProfile(
+		libseccomp.ActErrno.SetReturnCode(int16(syscall.EPERM)),
+		defaultBlockedSyscalls(),
+	)
 }
 
 func ApplyStrictProfile() error {
-	return applyProfile(libseccomp.ActKillProcess)
+	return applyProfile(
+		libseccomp.ActKillProcess,
+		defaultBlockedSyscalls(),
+	)
 }
 
-func applyProfile(action libseccomp.ScmpAction) error {
-	filter, err := libseccomp.NewFilter(libseccomp.ActAllow)
-	if err != nil {
-		return err
-	}
-
-	blockedSyscalls := []string{
+func defaultBlockedSyscalls() []string {
+	return []string{
 		"reboot",
 		"mount",
 		"umount2",
@@ -28,6 +51,13 @@ func applyProfile(action libseccomp.ScmpAction) error {
 		"setns",
 		"unshare",
 		"kexec_load",
+	}
+}
+
+func applyProfile(action libseccomp.ScmpAction, blockedSyscalls []string) error {
+	filter, err := libseccomp.NewFilter(libseccomp.ActAllow)
+	if err != nil {
+		return err
 	}
 
 	for _, syscallName := range blockedSyscalls {

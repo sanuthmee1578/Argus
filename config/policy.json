@@ -20,5 +20,5 @@
     "rootfs_path": "/tmp/argus-root",
     "enable_chroot": false,
     "enable_seccomp": true,
-    "seccomp_profile": "default"
+    "seccomp_profile": "no-network"
 }
