@@ -9,12 +9,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
 )
 
-func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bool, rootfsPath string, enableChroot bool) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
+func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bool, rootfsPath string, enableChroot bool, enableSeccomp bool, seccompProfile string) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	startTime := time.Now()
@@ -26,6 +27,12 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 		return "ERROR", "", time.Since(startTime), 0, startTime, endTime, map[string]string{}
 	}
 
+	helperPath, err := filepath.Abs("bin/argus-exec")
+	if err != nil {
+		fmt.Println("Error resolving argus-exec path:", err)
+		endTime := time.Now()
+		return "ERROR", "", time.Since(startTime), 0, startTime, endTime, map[string]string{}
+	}
 	var cmd *exec.Cmd
 
 	if enableChroot {
@@ -37,7 +44,12 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 			Cloneflags: syscall.CLONE_NEWNS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNET,
 		}
 	} else {
-		cmd = exec.CommandContext(ctx, "python3", prepared.ScriptName)
+		if enableSeccomp {
+			cmd = exec.CommandContext(ctx, helperPath, seccompProfile, "/usr/bin/python3", prepared.ScriptName)
+		} else {
+			cmd = exec.CommandContext(ctx, "/usr/bin/python3", prepared.ScriptName)
+		}
+
 		cmd.Dir = prepared.RuntimePath
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			Setpgid: true,

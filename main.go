@@ -45,7 +45,7 @@ func main() {
 		fmt.Println("Usage: argus run <script>")
 		return
 	}
-    // Extract the script from the arguments
+	// Extract the script from the arguments
 	script := os.Args[2]
 
 	if _, err := os.Stat(script); os.IsNotExist(err) {
@@ -115,7 +115,7 @@ func main() {
 	}
 
 	timeout := time.Duration(loadPolicy.Timeout) * time.Second
-	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB, loadPolicy.KeepSandbox, loadPolicy.RootfsPath, loadPolicy.EnableChroot)
+	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB, loadPolicy.KeepSandbox, loadPolicy.RootfsPath, loadPolicy.EnableChroot, loadPolicy.EnableSeccomp, loadPolicy.SeccompProfile)
 	err := logger.Write(script, status, output, warnings, duration, pid, startTime, endTime, monitorResults, analysis)
 	if err != nil {
 		fmt.Println("Error writing log:", err)
@@ -125,5 +125,3 @@ func main() {
 	fmt.Println("Output:", output)
 	fmt.Printf("Execution time: %v\n", duration)
 }
-
-
