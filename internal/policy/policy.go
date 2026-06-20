@@ -18,6 +18,10 @@ type Policy struct {
 	RootfsPath string `json:"rootfs_path"`
 
 	EnableChroot bool `json:"enable_chroot"`
+
+	EnableSeccomp bool `json:"enable_seccomp"`
+
+	SeccompProfile string `json:"seccomp_profile"`
 }
 
 func Load() Policy {
