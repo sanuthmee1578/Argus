@@ -5,6 +5,7 @@
 
 ---
 
+
 ## Why Argus?
 
 Modern developers increasingly run code they didn't fully write — AI-generated scripts, open source snippets, unfamiliar automation. Traditional tools force a bad choice:
