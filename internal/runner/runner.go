@@ -36,18 +36,45 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 	var cmd *exec.Cmd
 
 	if enableChroot {
-		cmd = exec.CommandContext(ctx, "/usr/bin/python3", prepared.ScriptName)
+		if enableSeccomp {
+			cmd = exec.CommandContext(
+				ctx,
+				"/usr/local/bin/argus-exec",
+				seccompProfile,
+				"/usr/bin/python3",
+				prepared.ScriptName,
+			)
+		} else {
+			cmd = exec.CommandContext(
+				ctx,
+				"/usr/bin/python3",
+				prepared.ScriptName,
+			)
+		}
+
 		cmd.Dir = prepared.RuntimePath
 		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Setpgid:    true,
-			Chroot:     rootfsPath,
-			Cloneflags: syscall.CLONE_NEWNS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNET,
+			Setpgid: true,
+			Chroot:  rootfsPath,
+			Cloneflags: syscall.CLONE_NEWNS |
+				syscall.CLONE_NEWPID |
+				syscall.CLONE_NEWNET,
 		}
 	} else {
 		if enableSeccomp {
-			cmd = exec.CommandContext(ctx, helperPath, seccompProfile, "/usr/bin/python3", prepared.ScriptName)
+			cmd = exec.CommandContext(
+				ctx,
+				helperPath,
+				seccompProfile,
+				"/usr/bin/python3",
+				prepared.ScriptName,
+			)
 		} else {
-			cmd = exec.CommandContext(ctx, "/usr/bin/python3", prepared.ScriptName)
+			cmd = exec.CommandContext(
+				ctx,
+				"/usr/bin/python3",
+				prepared.ScriptName,
+			)
 		}
 
 		cmd.Dir = prepared.RuntimePath
