@@ -4,21 +4,24 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 func Validate(rootfsPath string) []string {
 	missing := []string{}
 
 	requiredPaths := map[string]string{
-		"/usr/bin/python3":            "Python interpreter",
-		"/dev/null":                   "Required device file for process execution",
-		"/lib64/ld-linux-x86-64.so.2": "Dynamic loader",
+		"/usr/bin/python3":                      "Python interpreter",
+		"/dev/null":                             "Required device file for process execution",
+		"/lib64/ld-linux-x86-64.so.2":           "Dynamic loader",
+		"/usr/local/bin/argus-exec":             "Seccomp execution helper",
+		"/lib/x86_64-linux-gnu/libseccomp.so.2": "Seccomp runtime library",
 	}
 
 	for path, description := range requiredPaths {
 		fullPath := filepath.Join(rootfsPath, path[1:])
-		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-			missing = append(missing, path+" missing: "+description)
+		if _, err := os.Stat(fullPath); err != nil {
+			missing = append(missing, path+" unavailable: "+description+" ("+err.Error()+")")
 		}
 	}
 
@@ -31,10 +34,28 @@ func Validate(rootfsPath string) []string {
 
 }
 
+func createDevNull(rootfsPath string) error {
+	devNullPath := filepath.Join(rootfsPath, "dev/null")
+
+	if err := os.Remove(devNullPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	mode := uint32(syscall.S_IFCHR | 0666)
+	device := int((1 << 8) | 3)
+
+	if err := syscall.Mknod(devNullPath, mode, device); err != nil {
+		return err
+	}
+
+	return os.Chmod(devNullPath, 0666)
+}
+
 func Setup(rootfsPath string) error {
 	// Create necessary directories
 	dirs := []string{
 		"usr/bin",
+		"usr/local/bin",
 		"dev",
 		"lib/x86_64-linux-gnu",
 		"lib64",
@@ -53,6 +74,18 @@ func Setup(rootfsPath string) error {
 		return err
 	}
 
+	helperSrc, err := filepath.Abs("bin/argus-exec")
+	if err != nil {
+		return err
+	}
+
+	helperDst := filepath.Join(rootfsPath, "usr/local/bin/argus-exec")
+
+	err = copyFile(helperSrc, helperDst)
+	if err != nil {
+		return err
+	}
+
 	err = copyLibraries(rootfsPath)
 	if err != nil {
 		return err
@@ -66,9 +99,7 @@ func Setup(rootfsPath string) error {
 		return err
 	}
 
-	devNullPath := filepath.Join(rootfsPath, "dev/null")
-
-	err = os.WriteFile(devNullPath, []byte{}, 0666)
+	err = createDevNull(rootfsPath)
 	if err != nil {
 		return err
 	}
@@ -77,13 +108,22 @@ func Setup(rootfsPath string) error {
 }
 
 func copyFile(src string, dst string) error {
+	sourceInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
 	sourceFile, err := os.Open(src)
 	if err != nil {
 		return err
 	}
 	defer sourceFile.Close()
 
-	destFile, err := os.Create(dst)
+	destFile, err := os.OpenFile(
+		dst,
+		os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
+		sourceInfo.Mode(),
+	)
 	if err != nil {
 		return err
 	}
@@ -93,11 +133,13 @@ func copyFile(src string, dst string) error {
 	if err != nil {
 		return err
 	}
-	return nil
+
+	return os.Chmod(dst, sourceInfo.Mode())
 }
 
 func copyLibraries(rootfsPath string) error {
 	lib := []string{
+		"/lib/x86_64-linux-gnu/libseccomp.so.2",
 		"/lib/x86_64-linux-gnu/libm.so.6",
 		"/lib/x86_64-linux-gnu/libz.so.1",
 		"/lib/x86_64-linux-gnu/libexpat.so.1",
