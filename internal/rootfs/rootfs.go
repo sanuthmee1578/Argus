@@ -1,6 +1,7 @@
 package rootfs
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -91,8 +92,13 @@ func Setup(rootfsPath string) error {
 		return err
 	}
 
-	pythonStdlibSrc := "/usr/lib/python3.12"
-	pythonStdlibDst := filepath.Join(rootfsPath, "usr/lib/python3.12")
+	pythonStdlibSrc, err := findPythonStdlib()
+	if err != nil {
+		return err
+	}
+
+	pythonVersionDir := filepath.Base(pythonStdlibSrc)
+	pythonStdlibDst := filepath.Join(rootfsPath, "usr/lib", pythonVersionDir)
 
 	err = copyDir(pythonStdlibSrc, pythonStdlibDst)
 	if err != nil {
@@ -190,4 +196,17 @@ func copyDir(src string, dst string) error {
 	}
 
 	return nil
+}
+
+func findPythonStdlib() (string, error) {
+	matches, err := filepath.Glob("/usr/lib/python3.*")
+	if err != nil {
+		return "", err
+	}
+
+	if len(matches) == 0 {
+		return "", fmt.Errorf("no Python standard library found under /usr/lib")
+	}
+
+	return matches[0], nil
 }
