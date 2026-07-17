@@ -1,12 +1,13 @@
 package cgroup
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 )
 
-func Create(runID string, memoryLimitMB int) (string, error) {
+func Create(runID string, memoryLimitMB int, pidsLimit int, cpuQuota int, cpuPeriod int) (string, error) {
 	cgroupPath := filepath.Join("/sys/fs/cgroup", "argus-"+runID)
 
 	err := os.MkdirAll(cgroupPath, 0755)
@@ -23,13 +24,23 @@ func Create(runID string, memoryLimitMB int) (string, error) {
 	}
 
 	pidsMaxPath := filepath.Join(cgroupPath, "pids.max")
-	err = os.WriteFile(pidsMaxPath, []byte("20"), 0644)
+	err = os.WriteFile(
+		pidsMaxPath,
+		[]byte(strconv.Itoa(pidsLimit)),
+		0644,
+	)
 	if err != nil {
 		return "", err
 	}
 
 	cpuMaxPath := filepath.Join(cgroupPath, "cpu.max")
-	err = os.WriteFile(cpuMaxPath, []byte("50000 100000"), 0644)
+	cpuMaxValue := fmt.Sprintf("%d %d", cpuQuota, cpuPeriod)
+
+	err = os.WriteFile(
+		cpuMaxPath,
+		[]byte(cpuMaxValue),
+		0644,
+	)
 
 	if err != nil {
 		return "", err

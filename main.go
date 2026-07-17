@@ -115,7 +115,7 @@ func main() {
 	}
 
 	timeout := time.Duration(loadPolicy.Timeout) * time.Second
-	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB, loadPolicy.KeepSandbox, loadPolicy.RootfsPath, loadPolicy.EnableChroot, loadPolicy.EnableSeccomp, loadPolicy.SeccompProfile)
+	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB, loadPolicy.KeepSandbox, loadPolicy.RootfsPath, loadPolicy.EnableChroot, loadPolicy.EnableSeccomp, loadPolicy.SeccompProfile, loadPolicy.PidsLimit, loadPolicy.CPUQuota, loadPolicy.CPUPeriod)
 	err := logger.Write(script, status, output, warnings, duration, pid, startTime, endTime, monitorResults, analysis)
 	if err != nil {
 		fmt.Println("Error writing log:", err)

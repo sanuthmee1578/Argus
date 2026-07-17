@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bool, rootfsPath string, enableChroot bool, enableSeccomp bool, seccompProfile string) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
+func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bool, rootfsPath string, enableChroot bool, enableSeccomp bool, seccompProfile string, pidsLimit int, cpuQuota int, cpuPeriod int) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	startTime := time.Now()
@@ -95,7 +95,13 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 
 	runID := strconv.FormatInt(time.Now().UnixNano(), 10)
 
-	cgroupPath, err := cgroup.Create(runID, memoryLimitMB)
+	cgroupPath, err := cgroup.Create(
+		runID,
+		memoryLimitMB,
+		pidsLimit,
+		cpuQuota,
+		cpuPeriod,
+	)
 
 	if err != nil {
 		fmt.Println("Error creating cgroup:", err)

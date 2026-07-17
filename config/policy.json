@@ -16,6 +16,9 @@
         "id_rsa"
     ],
     "memory_limit_mb": 100,
+    "pids_limit": 20,
+    "cpu_quota": 50000,
+    "cpu_period": 100000,
     "keep_sandbox": false,
     "rootfs_path": "/tmp/argus-root",
     "enable_chroot": true,

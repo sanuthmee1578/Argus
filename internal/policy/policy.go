@@ -13,6 +13,12 @@ type Policy struct {
 
 	MemoryLimitMB int `json:"memory_limit_mb"`
 
+	PidsLimit int `json:"pids_limit"`
+
+	CPUQuota int `json:"cpu_quota"`
+
+	CPUPeriod int `json:"cpu_period"`
+
 	KeepSandbox bool `json:"keep_sandbox"`
 
 	RootfsPath string `json:"rootfs_path"`
