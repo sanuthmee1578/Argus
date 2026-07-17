@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 )
 
@@ -87,7 +89,12 @@ func Setup(rootfsPath string) error {
 		return err
 	}
 
-	err = copyLibraries(rootfsPath)
+	err = copyLibraries(
+		rootfsPath,
+		"/usr/bin/python3",
+		helperSrc,
+	)
+
 	if err != nil {
 		return err
 	}
@@ -143,27 +150,33 @@ func copyFile(src string, dst string) error {
 	return os.Chmod(dst, sourceInfo.Mode())
 }
 
-func copyLibraries(rootfsPath string) error {
-	lib := []string{
-		"/lib/x86_64-linux-gnu/libseccomp.so.2",
-		"/lib/x86_64-linux-gnu/libm.so.6",
-		"/lib/x86_64-linux-gnu/libz.so.1",
-		"/lib/x86_64-linux-gnu/libexpat.so.1",
-		"/lib/x86_64-linux-gnu/libc.so.6",
-		"/lib64/ld-linux-x86-64.so.2",
+func copyLibraries(rootfsPath string, binaryPaths ...string) error {
+	seen := make(map[string]bool)
+
+	for _, binaryPath := range binaryPaths {
+		libraries, err := discoverLibraries(binaryPath)
+		if err != nil {
+			return err
+		}
+
+		for _, libPath := range libraries {
+			if seen[libPath] {
+				continue
+			}
+			seen[libPath] = true
+
+			dst := filepath.Join(rootfsPath, strings.TrimPrefix(libPath, "/"))
+
+			if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+				return err
+			}
+
+			if err := copyFile(libPath, dst); err != nil {
+				return err
+			}
+		}
 	}
 
-	for _, libPath := range lib {
-		dst := filepath.Join(rootfsPath, libPath[1:])
-		err := os.MkdirAll(filepath.Dir(dst), 0755)
-		if err != nil {
-			return err
-		}
-		err = copyFile(libPath, dst)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -209,4 +222,39 @@ func findPythonStdlib() (string, error) {
 	}
 
 	return matches[0], nil
+}
+
+func discoverLibraries(binaryPath string) ([]string, error) {
+	output, err := exec.Command("ldd", binaryPath).Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to inspect dependencies for %s: %w", binaryPath, err)
+	}
+
+	var libraries []string
+
+	for _, line := range strings.Split(string(output), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Example:
+		// libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x...)
+		if strings.Contains(line, "=>") {
+			parts := strings.Fields(line)
+			if len(parts) >= 3 && filepath.IsAbs(parts[2]) {
+				libraries = append(libraries, parts[2])
+			}
+			continue
+		}
+
+		// Example:
+		// /lib64/ld-linux-x86-64.so.2 (0x...)
+		parts := strings.Fields(line)
+		if len(parts) >= 1 && filepath.IsAbs(parts[0]) {
+			libraries = append(libraries, parts[0])
+		}
+	}
+
+	return libraries, nil
 }
