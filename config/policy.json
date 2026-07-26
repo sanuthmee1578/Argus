@@ -19,7 +19,7 @@
     "pids_limit": 20,
     "cpu_quota": 50000,
     "cpu_period": 100000,
-    "keep_sandbox": false,
+    "keep_sandbox": true,
     "rootfs_path": "/tmp/argus-root",
     "enable_chroot": true,
     "enable_seccomp": true,
