@@ -10,3 +10,4 @@ reports/*
 argus
 
 *.exe
+coverage.out
