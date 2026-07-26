@@ -20,14 +20,18 @@ func main() {
 	}
 	command := os.Args[1]
 	if command == "setup-rootfs" {
-		loadPolicy := policy.Load()
+		loadPolicy, err := policy.Load("./config/policy.json")
+		if err != nil {
+			fmt.Println("Failed to load policy:", err)
+			os.Exit(1)
+		}
 
 		if os.Geteuid() != 0 {
 			fmt.Println("Rootfs setup requires root privileges. Run with sudo.")
 			return
 		}
 
-		err := rootfs.Setup(loadPolicy.RootfsPath)
+		err = rootfs.Setup(loadPolicy.RootfsPath)
 		if err != nil {
 			fmt.Println("Error setting up rootfs:", err)
 			return
@@ -53,7 +57,11 @@ func main() {
 		return
 	}
 
-	loadPolicy := policy.Load()
+	loadPolicy, err := policy.Load("./config/policy.json")
+	if err != nil {
+		fmt.Println("Failed to load policy:", err)
+		os.Exit(1)
+	}
 
 	warnings := scanner.Scan(loadPolicy.BlockedPatterns, script)
 
@@ -79,7 +87,7 @@ func main() {
 					fmt.Println("-", warning)
 				}
 
-				err := logger.Write(script, "BLOCKED_BY_USER", "Execution aborted by the user.", warnings, time.Duration(0), 0, time.Time{}, time.Time{}, map[string]string{}, analysis)
+				err = logger.Write(script, "BLOCKED_BY_USER", "Execution aborted by the user.", warnings, time.Duration(0), 0, time.Time{}, time.Time{}, map[string]string{}, analysis)
 				if err != nil {
 					fmt.Println("Error writing log:", err)
 				}
@@ -116,7 +124,7 @@ func main() {
 
 	timeout := time.Duration(loadPolicy.Timeout) * time.Second
 	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB, loadPolicy.KeepSandbox, loadPolicy.RootfsPath, loadPolicy.EnableChroot, loadPolicy.EnableSeccomp, loadPolicy.SeccompProfile, loadPolicy.PidsLimit, loadPolicy.CPUQuota, loadPolicy.CPUPeriod)
-	err := logger.Write(script, status, output, warnings, duration, pid, startTime, endTime, monitorResults, analysis)
+	err = logger.Write(script, status, output, warnings, duration, pid, startTime, endTime, monitorResults, analysis)
 	if err != nil {
 		fmt.Println("Error writing log:", err)
 		return

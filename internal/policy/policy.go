@@ -2,6 +2,7 @@ package policy
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 )
 
@@ -12,12 +13,9 @@ type Policy struct {
 	BlockedPatterns []string `json:"blocked_patterns"`
 
 	MemoryLimitMB int `json:"memory_limit_mb"`
-
-	PidsLimit int `json:"pids_limit"`
-
-	CPUQuota int `json:"cpu_quota"`
-
-	CPUPeriod int `json:"cpu_period"`
+	PidsLimit     int `json:"pids_limit"`
+	CPUQuota      int `json:"cpu_quota"`
+	CPUPeriod     int `json:"cpu_period"`
 
 	KeepSandbox bool `json:"keep_sandbox"`
 
@@ -25,25 +23,21 @@ type Policy struct {
 
 	EnableChroot bool `json:"enable_chroot"`
 
-	EnableSeccomp bool `json:"enable_seccomp"`
-
+	EnableSeccomp  bool   `json:"enable_seccomp"`
 	SeccompProfile string `json:"seccomp_profile"`
 }
 
-func Load() Policy {
-	data, err := os.ReadFile("./config/policy.json")
+func Load(path string) (Policy, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		panic("Error reading policy file: " + err.Error())
+		return Policy{}, fmt.Errorf("error reading policy file: %w", err)
 	}
 
-	var policy Policy
+	var loadedPolicy Policy
 
-	error := json.Unmarshal(data, &policy)
-
-	if error != nil {
-		panic("Error parsing policy file: " + error.Error())
+	if err := json.Unmarshal(data, &loadedPolicy); err != nil {
+		return Policy{}, fmt.Errorf("error parsing policy file: %w", err)
 	}
 
-	return policy
-
+	return loadedPolicy, nil
 }
