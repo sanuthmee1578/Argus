@@ -2,12 +2,181 @@ package monitor
 
 import (
 	"os"
-	"os/exec"
-	"strconv"
-	"strings"
+	"path/filepath"
+	"reflect"
 	"testing"
-	"time"
 )
+
+func TestReadStatus(t *testing.T) {
+	root := useFakeProc(t)
+	writeProcFile(t, root, "123/status", "Name:\targus\nState:\tS (sleeping)\nVmRSS:\t2048 kB\nThreads:\t7\nUid:\t1000\n")
+
+	got := ReadStatus(123)
+	want := map[string]string{
+		"State":   "S (sleeping)",
+		"VmRSS":   "2048 kB",
+		"Threads": "7",
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ReadStatus(123) = %#v, want %#v", got, want)
+	}
+}
+
+func TestReadStatusMalformedProcContent(t *testing.T) {
+	root := useFakeProc(t)
+	writeProcFile(t, root, "123/status", "State: R (running)\nVmRSS:\nThreads:\t4\nVmRSS:\t4096 kB\n")
+
+	got := ReadStatus(123)
+	want := map[string]string{
+		"Threads": "4",
+		"VmRSS":   "4096 kB",
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ReadStatus malformed content = %#v, want %#v", got, want)
+	}
+}
+
+func TestReadStatusMissingFileReturnsEmptyMap(t *testing.T) {
+	useFakeProc(t)
+
+	got := ReadStatus(404)
+	if len(got) != 0 {
+		t.Fatalf("ReadStatus missing file = %#v, want empty map", got)
+	}
+}
+
+func TestReadStatusEmptyFileReturnsEmptyMap(t *testing.T) {
+	root := useFakeProc(t)
+	writeProcFile(t, root, "123/status", "")
+
+	got := ReadStatus(123)
+	if len(got) != 0 {
+		t.Fatalf("ReadStatus empty file = %#v, want empty map", got)
+	}
+}
+
+func TestReadChildren(t *testing.T) {
+	root := useFakeProc(t)
+	writeProcFile(t, root, "123/task/123/children", "456 789\n101112\t")
+
+	got := ReadChildren(123)
+	want := []string{"456", "789", "101112"}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ReadChildren(123) = %#v, want %#v", got, want)
+	}
+}
+
+func TestReadChildrenMissingFileReturnsEmptySlice(t *testing.T) {
+	useFakeProc(t)
+
+	got := ReadChildren(404)
+	if len(got) != 0 {
+		t.Fatalf("ReadChildren missing file = %#v, want empty slice", got)
+	}
+}
+
+func TestReadChildrenEmptyFileReturnsEmptySlice(t *testing.T) {
+	root := useFakeProc(t)
+	writeProcFile(t, root, "123/task/123/children", "")
+
+	got := ReadChildren(123)
+	if len(got) != 0 {
+		t.Fatalf("ReadChildren empty file = %#v, want empty slice", got)
+	}
+}
+
+func TestReadProcessName(t *testing.T) {
+	root := useFakeProc(t)
+	writeProcFile(t, root, "123/comm", "python3\n")
+
+	got := ReadProcessName("123")
+	if got != "python3" {
+		t.Fatalf("ReadProcessName(123) = %q, want %q", got, "python3")
+	}
+}
+
+func TestReadProcessNameMissingFileReturnsEmptyString(t *testing.T) {
+	useFakeProc(t)
+
+	got := ReadProcessName("404")
+	if got != "" {
+		t.Fatalf("ReadProcessName missing file = %q, want empty string", got)
+	}
+}
+
+func TestReadProcessNameEmptyFileReturnsEmptyString(t *testing.T) {
+	root := useFakeProc(t)
+	writeProcFile(t, root, "123/comm", "")
+
+	got := ReadProcessName("123")
+	if got != "" {
+		t.Fatalf("ReadProcessName empty file = %q, want empty string", got)
+	}
+}
+
+func TestReadProcessCommand(t *testing.T) {
+	root := useFakeProc(t)
+	writeProcFile(t, root, "123/cmdline", "python3\x00script.py\x00--verbose\x00")
+
+	got := ReadProcessCommand("123")
+	want := "python3 script.py --verbose"
+	if got != want {
+		t.Fatalf("ReadProcessCommand(123) = %q, want %q", got, want)
+	}
+}
+
+func TestReadProcessCommandMissingFileReturnsEmptyString(t *testing.T) {
+	useFakeProc(t)
+
+	got := ReadProcessCommand("404")
+	if got != "" {
+		t.Fatalf("ReadProcessCommand missing file = %q, want empty string", got)
+	}
+}
+
+func TestReadProcessCommandEmptyFileReturnsEmptyString(t *testing.T) {
+	root := useFakeProc(t)
+	writeProcFile(t, root, "123/cmdline", "")
+
+	got := ReadProcessCommand("123")
+	if got != "" {
+		t.Fatalf("ReadProcessCommand empty file = %q, want empty string", got)
+	}
+}
+
+func TestReadChildrenDetails(t *testing.T) {
+	root := useFakeProc(t)
+	writeProcFile(t, root, "123/task/123/children", "456 789")
+	writeProcFile(t, root, "456/comm", "python3\n")
+	writeProcFile(t, root, "456/cmdline", "python3\x00worker.py\x00")
+	writeProcFile(t, root, "789/comm", "bash\n")
+	writeProcFile(t, root, "789/cmdline", "bash\x00-c\x00id\x00")
+
+	got := ReadChildrenDetails(123)
+	want := []ChildProcessDetails{
+		{PID: "456", Name: "python3", Command: "python3 worker.py"},
+		{PID: "789", Name: "bash", Command: "bash -c id"},
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ReadChildrenDetails(123) = %#v, want %#v", got, want)
+	}
+}
+
+func TestReadChildrenDetailsMissingChildFiles(t *testing.T) {
+	root := useFakeProc(t)
+	writeProcFile(t, root, "123/task/123/children", "456")
+
+	got := ReadChildrenDetails(123)
+	want := []ChildProcessDetails{{PID: "456", Name: "", Command: ""}}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ReadChildrenDetails missing child files = %#v, want %#v", got, want)
+	}
+}
 
 func TestIsSuspiciousProcess(t *testing.T) {
 	t.Parallel()
@@ -31,7 +200,7 @@ func TestIsSuspiciousProcess(t *testing.T) {
 			want:        true,
 		},
 		{
-			name:        "safe process",
+			name:        "normal process name and command",
 			processName: "python3",
 			command:     "python3 script.py",
 			want:        false,
@@ -71,6 +240,11 @@ func TestIsSuspiciousCommand(t *testing.T) {
 			want:    true,
 		},
 		{
+			name:    "sh command execution",
+			command: "/bin/sh -c 'id'",
+			want:    true,
+		},
+		{
 			name:    "python command execution",
 			command: "python3 -c 'import os'",
 			want:    true,
@@ -91,8 +265,8 @@ func TestIsSuspiciousCommand(t *testing.T) {
 			want:    true,
 		},
 		{
-			name:    "safe command",
-			command: "python3 script.py",
+			name:    "normal command",
+			command: "python3 script.py --input data.json",
 			want:    false,
 		},
 		{
@@ -120,108 +294,27 @@ func TestIsSuspiciousCommand(t *testing.T) {
 	}
 }
 
-func TestReadStatusCurrentProcess(t *testing.T) {
-	t.Parallel()
+func useFakeProc(t *testing.T) string {
+	t.Helper()
 
-	got := ReadStatus(os.Getpid())
-	for _, key := range []string{"State", "Threads", "VmRSS"} {
-		value := got[key]
-		if value == "" {
-			t.Fatalf("ReadStatus(os.Getpid()) missing %q in %#v", key, got)
-		}
-	}
-}
-
-func TestReadStatusMissingProcessReturnsEmptyMap(t *testing.T) {
-	t.Parallel()
-
-	got := ReadStatus(missingPID())
-	if len(got) != 0 {
-		t.Fatalf("ReadStatus(missingPID) = %#v, want empty map", got)
-	}
-}
-
-func TestReadChildrenIncludesSpawnedChild(t *testing.T) {
-	cmd := exec.Command("sleep", "2")
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("start child process: %v", err)
-	}
+	previous := procRoot
+	root := t.TempDir()
+	procRoot = root
 	t.Cleanup(func() {
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
+		procRoot = previous
 	})
 
-	wantPID := strconv.Itoa(cmd.Process.Pid)
-	deadline := time.Now().Add(500 * time.Millisecond)
-	for {
-		got := ReadChildren(os.Getpid())
-		if contains(got, wantPID) {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("ReadChildren(os.Getpid()) = %#v, want child PID %s", got, wantPID)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	return root
 }
 
-func TestReadChildrenMissingProcessReturnsEmptySlice(t *testing.T) {
-	t.Parallel()
+func writeProcFile(t *testing.T, root, name, content string) {
+	t.Helper()
 
-	got := ReadChildren(missingPID())
-	if len(got) != 0 {
-		t.Fatalf("ReadChildren(missingPID) = %#v, want empty slice", got)
+	path := filepath.Join(root, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatalf("create proc fixture directory: %v", err)
 	}
-}
-
-func TestReadProcessFiles(t *testing.T) {
-	t.Parallel()
-
-	pid := strconv.Itoa(os.Getpid())
-	name := ReadProcessName(pid)
-	if name == "" {
-		t.Fatal("ReadProcessName(os.Getpid()) returned empty string")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("write proc fixture file: %v", err)
 	}
-
-	command := ReadProcessCommand(pid)
-	if command == "" {
-		t.Fatal("ReadProcessCommand(os.Getpid()) returned empty string")
-	}
-	if strings.Contains(command, "\x00") {
-		t.Fatalf("ReadProcessCommand(os.Getpid()) contains raw null separators: %q", command)
-	}
-}
-
-func TestMissingProcessFilesReturnEmptyStrings(t *testing.T) {
-	t.Parallel()
-
-	pid := strconv.Itoa(missingPID())
-	if got := ReadProcessName(pid); got != "" {
-		t.Fatalf("ReadProcessName(missingPID) = %q, want empty string", got)
-	}
-	if got := ReadProcessCommand(pid); got != "" {
-		t.Fatalf("ReadProcessCommand(missingPID) = %q, want empty string", got)
-	}
-}
-
-func TestReadChildrenDetailsForMissingProcessReturnsEmptySlice(t *testing.T) {
-	t.Parallel()
-
-	got := ReadChildrenDetails(missingPID())
-	if len(got) != 0 {
-		t.Fatalf("ReadChildrenDetails(missingPID) = %#v, want empty slice", got)
-	}
-}
-
-func missingPID() int {
-	return 999999999
-}
-
-func contains(values []string, want string) bool {
-	for _, value := range values {
-		if value == want {
-			return true
-		}
-	}
-	return false
 }

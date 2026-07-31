@@ -3,10 +3,13 @@ package monitor
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
+
+var procRoot = "/proc"
 
 type ChildProcessDetails struct {
 	PID     string
@@ -18,7 +21,7 @@ func ReadStatus(pid int) map[string]string {
 	results := map[string]string{}
 
 	pidString := strconv.Itoa(pid)
-	path := "/proc/" + pidString + "/status"
+	path := filepath.Join(procRoot, pidString, "status")
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -173,7 +176,8 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 
 func ReadChildren(pid int) []string {
 	children := []string{}
-	path := "/proc/" + strconv.Itoa(pid) + "/task/" + strconv.Itoa(pid) + "/children"
+	pidString := strconv.Itoa(pid)
+	path := filepath.Join(procRoot, pidString, "task", pidString, "children")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return children
@@ -184,7 +188,7 @@ func ReadChildren(pid int) []string {
 }
 
 func ReadProcessName(pid string) string {
-	path := "/proc/" + pid + "/comm"
+	path := filepath.Join(procRoot, pid, "comm")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""
@@ -193,7 +197,7 @@ func ReadProcessName(pid string) string {
 }
 
 func ReadProcessCommand(pid string) string {
-	path := "/proc/" + pid + "/cmdline"
+	path := filepath.Join(procRoot, pid, "cmdline")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""
