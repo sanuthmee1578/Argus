@@ -32,6 +32,24 @@ Analysis:
 
 ## Features
 
+### v0.1 Capability Checklist
+
+- [x] Static malware scanning
+- [x] Behavior analysis
+- [x] Chroot isolation
+- [x] Mount namespace
+- [x] PID namespace
+- [x] Network namespace
+- [x] cgroup v2
+- [x] Memory limits
+- [x] CPU quota
+- [x] Process limits
+- [x] Seccomp syscall filtering
+- [x] JSON reports
+- [x] CLI interface
+- [x] Doctor diagnostics
+- [x] Sandbox inspection
+
 ### Static Analysis (SAST-lite)
 Scans scripts for dangerous patterns before a single line executes. Depending on policy, Argus warns, prompts for confirmation, or blocks outright.
 
@@ -81,7 +99,15 @@ All behavior is driven by `config/policy.json` — not hardcoded logic:
         "socket.connect",
         "rm -rf"
     ],
-    "memory_limit_mb": 20
+    "memory_limit_mb": 100,
+    "pids_limit": 20,
+    "cpu_quota": 50000,
+    "cpu_period": 100000,
+    "keep_sandbox": true,
+    "rootfs_path": "/tmp/argus-root",
+    "enable_chroot": true,
+    "enable_seccomp": true,
+    "seccomp_profile": "no-network"
 }
 ```
 
@@ -91,6 +117,11 @@ All behavior is driven by `config/policy.json` — not hardcoded logic:
 | `strict_mode` | `true` blocks on any detected pattern; `false` prompts the user |
 | `blocked_patterns` | List of patterns the static scanner checks |
 | `memory_limit_mb` | Memory ceiling — process is killed if exceeded |
+| `pids_limit` | cgroup process ceiling via `pids.max` |
+| `cpu_quota` / `cpu_period` | cgroup CPU quota via `cpu.max` |
+| `enable_chroot` | Runs scripts inside the configured root filesystem |
+| `enable_seccomp` | Applies the selected seccomp syscall profile |
+| `seccomp_profile` | Seccomp profile name, such as `no-network` |
 
 ### Structured Execution Reports
 Every run produces a timestamped report file — never overwriting previous runs:
@@ -119,6 +150,7 @@ When a timeout or memory violation occurs, Argus kills the entire process group 
 | `BLOCKED_BY_POLICY` | Blocked before execution — strict mode + suspicious pattern |
 | `BLOCKED_BY_USER` | User declined to proceed when prompted |
 | `MEMORY_LIMIT_EXCEEDED` | Process killed for exceeding memory policy |
+| `SECURITY_VIOLATION` | Runtime security enforcement blocked the script |
 
 ---
 
@@ -136,13 +168,16 @@ argus run script.py
         ▼
   Execution Engine            Go runtime with context timeout
         │                     process group isolation (Setpgid)
+        │                     chroot + mount/PID/network namespaces
         ▼
   Runtime Monitor             /proc polling goroutine (100ms)
         │                     peak memory tracking
         │                     child process tree inspection
         │                     suspicious process classification
         ▼
-  Enforcement Layer           kill on memory violation
+  Enforcement Layer           cgroup memory/PID/CPU controls
+        │                     seccomp syscall filtering
+        │                     kill on memory violation
         │                     kill on timeout
         │                     SIGKILL to process group (-pid)
         ▼
@@ -179,6 +214,13 @@ Argus/
 │   ├── child_test.py               # Child process test
 │   ├── child_no_flag.py            # Child process (no blocked patterns)
 │   └── suspicious_child_test.py   # Suspicious child detection test
+├── examples/                       # Controlled demo scripts
+│   ├── safe.py
+│   ├── timeout.py
+│   ├── memory.py
+│   ├── network.py
+│   ├── process_limit.py
+│   └── suspicious.py
 ├── reports/                        # Timestamped execution reports
 └── logs/
 ```
@@ -214,6 +256,115 @@ go build -o argus .
 
 # Run a script and observe child process monitoring
 ./argus run scripts/child_no_flag.py
+```
+
+### Controlled Examples
+
+The `examples/` folder contains documented demos for success, timeout, memory
+limit, runtime network enforcement, process limit enforcement, and suspicious
+static-pattern detection.
+
+```bash
+./argus run examples/safe.py
+./argus run examples/timeout.py
+./argus run examples/memory.py
+./argus run examples/network.py
+./argus run examples/process_limit.py
+./argus run examples/suspicious.py
+```
+
+### Terminal Screenshots
+
+`argus doctor`
+
+```text
+Environment check
+────────────────────────────────────────
+[PASS] Linux operating system      linux/amd64
+[PASS] Policy configuration        ./config/policy.json
+[PASS] cgroup v2                   /sys/fs/cgroup/cgroup.controllers
+[PASS] Rootfs directory            /tmp/argus-root
+[PASS] Rootfs validation           required runtime files are available
+[PASS] Python runtime              /tmp/argus-root/usr/bin/python3
+[PASS] Seccomp execution helper    /tmp/argus-root/usr/local/bin/argus-exec
+[PASS] libseccomp runtime          /tmp/argus-root/lib/x86_64-linux-gnu/libseccomp.so.2
+[PASS] /dev/null device            /tmp/argus-root/dev/null
+[PASS] Current privileges          root privileges available
+
+Argus is ready to execute workloads.
+```
+
+`argus run examples/safe.py`
+
+```text
+Execution result
+────────────────────────────────────────────────
+Status             SUCCESS
+Execution time     29ms
+Peak memory        not sampled
+Memory exceeded    false
+
+Program output
+────────────────────────────────────────────────
+safe demo completed: total=45
+```
+
+`argus run examples/memory.py`
+
+```text
+Execution result
+────────────────────────────────────────────────
+Status             MEMORY_LIMIT_EXCEEDED
+Reason             Execution exceeded the configured memory limit
+Peak memory        104 MB
+Memory exceeded    true
+```
+
+`argus run examples/network.py`
+
+```text
+Execution result
+────────────────────────────────────────────────
+Status             SECURITY_VIOLATION
+Reason             Network syscall blocked by seccomp
+
+Program output
+────────────────────────────────────────────────
+attempting one outbound socket operation
+PermissionError: [Errno 1] Operation not permitted
+```
+
+`argus run examples/process_limit.py`
+
+```text
+Program output
+────────────────────────────────────────────────
+starting up to 48 child processes
+started child 1: pid=...
+...
+fork failed at child 18: [Errno 11] Resource temporarily unavailable
+process-limit demo completed: children_started=18
+```
+
+`argus scan examples/suspicious.py`
+
+```text
+Static security scan
+────────────────────────────────────────
+Target: examples/suspicious.py
+
+Result: SUSPICIOUS
+Warnings: 1
+
+  1. os.system
+
+Behavior analysis
+
+  HIGH    Shell execution
+          Pattern: os.system
+          Script may execute arbitrary system commands.
+
+Policy decision: execution would be blocked in strict mode.
 ```
 
 ### Configure Policy
