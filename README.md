@@ -1,7 +1,13 @@
 # Argus
 ### Secure Runtime for AI-Generated & Untrusted Code
 
-<img src="images/CLI_Execution_demo.png" width="200" alt="Logo">
+<p align="center">
+  <img
+    src="images/CLI_Execution_demo.png"
+    alt="Argus secure execution CLI"
+    width="900"
+  >
+</p>
 
 ---
 
