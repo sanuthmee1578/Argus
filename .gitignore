@@ -11,6 +11,7 @@ argus
 
 *.exe
 coverage.out
+go.sum
 
 # Compiled binaries
 /argus
