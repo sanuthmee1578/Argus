@@ -60,7 +60,7 @@ func TestRunScriptMapsExecutionStatuses(t *testing.T) {
 
 			text := stdout.String()
 			for _, want := range []string{
-				"Argus Secure Execution Runtime",
+				"argus secure execution runtime",
 				"___",
 				"Checks: ✓ Policy",
 				"Configuration",

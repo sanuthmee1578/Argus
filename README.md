@@ -304,7 +304,7 @@ Argus is ready to execute workloads.
                         /_/  |_/_/   \__, /\__,_/____/
                                     /____/
 
-                      Argus Secure Execution Runtime
+                      argus secure execution runtime
 ────────────────────────────────────────────────────────────────────────
 Target       examples/safe.py        Policy       ./config/policy.json
 

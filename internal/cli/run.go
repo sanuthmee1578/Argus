@@ -339,15 +339,31 @@ func printCenteredRunLogo(w io.Writer) {
 		" / ___ |/ /  / /_/ / /_/ (__  )",
 		"/_/  |_/_/   \\__, /\\__,_/____/",
 		"            /____/",
-		"",
-		"Argus Secure Execution Runtime",
 	}
+
+	const layoutWidth = 72
+
+	maxLogoWidth := 0
+	for _, line := range logoLines {
+		if len(line) > maxLogoWidth {
+			maxLogoWidth = len(line)
+		}
+	}
+
+	leftPadding := 0
+	if layoutWidth > maxLogoWidth {
+		leftPadding = (layoutWidth - maxLogoWidth) / 2
+	}
+
+	padding := strings.Repeat(" ", leftPadding)
 
 	for _, line := range logoLines {
-		fmt.Fprintln(w, centerText(line, 72))
+		fmt.Fprintln(w, padding+line)
 	}
-}
 
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, centerText("Argus Secure Execution Runtime", layoutWidth))
+}
 func centerText(text string, width int) string {
 	if text == "" {
 		return ""
