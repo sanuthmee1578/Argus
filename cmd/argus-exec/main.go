@@ -25,29 +25,8 @@ func main() {
 	fmt.Println("Program:", program)
 	fmt.Println("Script:", script)
 
-	if profile == "default" {
-		err := seccomp.ApplyDefaultProfile()
-		if err != nil {
-			fmt.Println("Failed to apply default seccomp profile:", err)
-			os.Exit(1)
-		}
-	} else if profile == "strict" {
-		err := seccomp.ApplyStrictProfile()
-		if err != nil {
-			fmt.Println("Failed to apply strict seccomp profile:", err)
-			os.Exit(1)
-		}
-
-	} else if profile == "no-network" {
-		err := seccomp.ApplyNoNetworkProfile()
-		if err != nil {
-			fmt.Println("Failed to apply no-network seccomp profile:", err)
-			os.Exit(1)
-		}
-	} else if profile == "none" {
-		fmt.Println("Seccomp disabled")
-	} else {
-		fmt.Println("Unknown seccomp profile:", profile)
+	if err := seccomp.ApplyProfile(profile); err != nil {
+		fmt.Fprintf(os.Stderr, "apply seccomp profile: %v\n", err)
 		os.Exit(1)
 	}
 
