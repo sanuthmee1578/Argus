@@ -1,7 +1,7 @@
 # Argus
 ### Secure Runtime for AI-Generated & Untrusted Code
 
-> A policy-driven, Linux-based execution engine that combines static analysis, runtime monitoring, process tree inspection, and behavioral intent analysis to safely run untrusted scripts.
+<img src="images/CLI_Execution_demo.png" width="200" alt="Logo">
 
 ---
 
