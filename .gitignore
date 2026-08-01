@@ -11,3 +11,19 @@ argus
 
 *.exe
 coverage.out
+
+# Compiled binaries
+/argus
+/bin/argus
+/bin/argus-exec
+
+# Coverage
+coverage.out
+seccomp-coverage.out
+
+# Runtime output
+/logs/*
+!/logs/.gitkeep
+
+/reports/*
+!/reports/.gitkeep
