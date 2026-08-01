@@ -59,7 +59,7 @@ func TestRunInspectDisplaysReport(t *testing.T) {
 		"Peak memory        12 MB",
 		"Behavior analysis",
 		"Pattern: os.system",
-		"Program output",
+		"Output",
 		"partial output",
 	} {
 		if !strings.Contains(text, want) {

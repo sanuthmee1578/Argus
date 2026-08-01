@@ -297,14 +297,36 @@ Argus is ready to execute workloads.
 `argus run examples/safe.py`
 
 ```text
-Execution result
-────────────────────────────────────────────────
-Status             SUCCESS
-Execution time     29ms
-Peak memory        not sampled
-Memory exceeded    false
+                                    ___
+                           /   |  _________ ___  _______
+                          / /| | / ___/ __ `/ / / / ___/
+                         / ___ |/ /  / /_/ / /_/ (__  )
+                        /_/  |_/_/   \__, /\__,_/____/
+                                    /____/
 
-Program output
+                      Argus Secure Execution Runtime
+────────────────────────────────────────────────────────────────────────
+Target       examples/safe.py        Policy       ./config/policy.json
+
+Checks: ✓ Policy  ✓ Static Scan  ✓ Rootfs  ✓ Environment
+
+Configuration
+────────────────────────────────────────────────
+Strict       enabled                 Chroot       enabled
+Namespaces   mount | pid | network   Seccomp      no-network
+Memory       100 MB                  PID limit    20
+CPU quota    50000/100000            Timeout      15s
+Sandbox      retained                Rootfs       /tmp/argus-root
+
+Result
+────────────────────────────────────────────────
+✓ SUCCESS
+
+Run ID       1785590000000000000     PID          93890
+Time         29 ms                   Peak RSS     not sampled
+Memory hit   false                   Sandbox      retained
+
+Output
 ────────────────────────────────────────────────
 safe demo completed: total=45
 ```
@@ -312,23 +334,29 @@ safe demo completed: total=45
 `argus run examples/memory.py`
 
 ```text
-Execution result
+Result
 ────────────────────────────────────────────────
-Status             MEMORY_LIMIT_EXCEEDED
+✗ MEMORY_LIMIT_EXCEEDED
 Reason             Execution exceeded the configured memory limit
-Peak memory        104 MB
-Memory exceeded    true
+
+Run ID       1785590000000000000     PID          94120
+Time         842 ms                  Peak RSS     104 MB
+Memory hit   true                    Sandbox      retained
 ```
 
 `argus run examples/network.py`
 
 ```text
-Execution result
+Result
 ────────────────────────────────────────────────
-Status             SECURITY_VIOLATION
+✗ SECURITY_VIOLATION
 Reason             Network syscall blocked by seccomp
 
-Program output
+Run ID       1785590000000000000     PID          94418
+Time         45 ms                   Peak RSS     < 1 MB
+Memory hit   false                   Sandbox      retained
+
+Output
 ────────────────────────────────────────────────
 attempting one outbound socket operation
 PermissionError: [Errno 1] Operation not permitted
@@ -337,7 +365,7 @@ PermissionError: [Errno 1] Operation not permitted
 `argus run examples/process_limit.py`
 
 ```text
-Program output
+Output
 ────────────────────────────────────────────────
 starting up to 48 child processes
 started child 1: pid=...

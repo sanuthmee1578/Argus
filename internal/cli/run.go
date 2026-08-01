@@ -61,7 +61,6 @@ func RunScriptWithDependencies(
 	scriptPath string,
 	dependencies RunDependencies,
 ) int {
-	PrintBanner(out)
 	startTime := time.Now()
 	execute := dependencies.Execute
 	if execute == nil {
@@ -69,7 +68,7 @@ func RunScriptWithDependencies(
 	}
 
 	if _, err := os.Stat(scriptPath); err != nil {
-		printSection(out, "Secure execution")
+		printRunTitle(out)
 		printField(out, "Target", scriptPath)
 		fmt.Fprintln(out)
 		fmt.Fprintf(errOut, "script unavailable: %v\n", err)
@@ -78,7 +77,7 @@ func RunScriptWithDependencies(
 
 	loadedPolicy, err := policy.Load(policyPath)
 	if err != nil {
-		printSection(out, "Secure execution")
+		printRunTitle(out)
 		printField(out, "Target", scriptPath)
 		printField(out, "Policy", policyPath)
 		fmt.Fprintln(out)
@@ -87,7 +86,7 @@ func RunScriptWithDependencies(
 	}
 
 	timeout := time.Duration(loadedPolicy.Timeout) * time.Second
-	printRunConfiguration(out, policyPath, scriptPath, loadedPolicy, timeout)
+	printRunHeader(out, scriptPath, policyPath)
 
 	warnings := scanner.Scan(
 		loadedPolicy.BlockedPatterns,
@@ -95,10 +94,9 @@ func RunScriptWithDependencies(
 	)
 	analysis := behavior.Analyze(warnings)
 
-	printStep(out, true, "Policy loaded")
-	printStep(out, true, "Static pattern scan completed")
-
 	if len(warnings) > 0 {
+		printChecks(out, checkState{"Policy", true}, checkState{"Static Scan", true})
+		fmt.Fprintln(out)
 		fmt.Fprintf(out, "[WARN] %d suspicious pattern(s) detected\n", len(warnings))
 		fmt.Fprintln(out)
 		printSection(out, "Behavior analysis")
@@ -162,25 +160,48 @@ func RunScriptWithDependencies(
 	}
 
 	if loadedPolicy.EnableChroot && os.Geteuid() != 0 {
-		printStep(out, false, "Execution environment ready")
-		fmt.Fprintf(errOut, "chroot mode requires root privileges; run with sudo or disable enable_chroot\n")
+		reason := "chroot mode requires root privileges; run with sudo or disable enable_chroot"
+		printChecks(
+			out,
+			checkState{"Policy", true},
+			checkState{"Static Scan", true},
+			checkState{"Rootfs", true},
+			checkState{"Environment", false},
+		)
+		printField(out, "Reason", reason)
+		fmt.Fprintln(out)
 		return ExitGeneralError
 	}
 
 	if loadedPolicy.EnableChroot {
 		missing := rootfs.Validate(loadedPolicy.RootfsPath)
 		if len(missing) > 0 {
-			printStep(out, false, "Rootfs validated")
+			reason := "rootfs validation failed"
+			printChecks(
+				out,
+				checkState{"Policy", true},
+				checkState{"Static Scan", true},
+				checkState{"Rootfs", false},
+				checkState{"Environment", false},
+			)
+			printField(out, "Reason", reason)
+			fmt.Fprintln(out)
 			for _, issue := range missing {
-				fmt.Fprintf(errOut, "rootfs validation failed: %s\n", issue)
+				fmt.Fprintf(errOut, "%s: %s\n", reason, issue)
 			}
 			return ExitGeneralError
 		}
 	}
 
-	printStep(out, true, "Rootfs validated")
-	printStep(out, true, "Execution environment ready")
+	printChecks(
+		out,
+		checkState{"Policy", true},
+		checkState{"Static Scan", true},
+		checkState{"Rootfs", true},
+		checkState{"Environment", true},
+	)
 	fmt.Fprintln(out)
+	printRunConfiguration(out, loadedPolicy, timeout)
 
 	result := execute(
 		scriptPath,
@@ -210,6 +231,7 @@ func RunScriptWithDependencies(
 		return ExitGeneralError
 	}
 
+	fmt.Fprintln(out)
 	printExecutionResult(out, result)
 	printProgramOutput(out, result.Output)
 	fmt.Fprintln(out)
@@ -291,63 +313,146 @@ func normalizeAnalysis(analysis []behavior.Analysis) []behavior.Analysis {
 
 func printReportPaths(w io.Writer, paths report.Paths) {
 	printSection(w, "Reports")
-	printField(w, "Text", paths.Text)
-	printField(w, "JSON", paths.JSON)
+	printField(w, "log", paths.Text)
+	printField(w, "json", paths.JSON)
 }
 
 func newRunID() string {
 	return strconv.FormatInt(time.Now().UnixNano(), 10)
 }
 
-func printRunConfiguration(
-	w io.Writer,
-	policyPath string,
-	scriptPath string,
-	loadedPolicy policy.Policy,
-	timeout time.Duration,
-) {
-	printSection(w, "Secure execution")
-	printField(w, "Target", scriptPath)
-	printField(w, "Policy", policyPath)
-	printField(w, "Strict mode", enabledLabel(loadedPolicy.StrictMode))
-	printField(w, "Chroot", enabledLabel(loadedPolicy.EnableChroot))
-	printField(w, "Namespaces", namespaceLabel(loadedPolicy.EnableChroot))
-	printField(w, "Seccomp", seccompLabel(loadedPolicy.EnableSeccomp, loadedPolicy.SeccompProfile))
-	printField(w, "Memory limit", fmt.Sprintf("%d MB", loadedPolicy.MemoryLimitMB))
-	printField(w, "PID limit", loadedPolicy.PidsLimit)
-	printField(w, "CPU quota", fmt.Sprintf("%d / %d", loadedPolicy.CPUQuota, loadedPolicy.CPUPeriod))
-	printField(w, "Timeout", timeout)
-	printField(w, "Keep sandbox", loadedPolicy.KeepSandbox)
+type checkState struct {
+	name   string
+	passed bool
+}
+
+func printRunTitle(w io.Writer) {
+	printCenteredRunLogo(w)
+	fmt.Fprintln(w, strings.Repeat("─", 72))
+}
+
+func printCenteredRunLogo(w io.Writer) {
+	logoLines := []string{
+		"    ___",
+		"   /   |  _________ ___  _______",
+		"  / /| | / ___/ __ `/ / / / ___/",
+		" / ___ |/ /  / /_/ / /_/ (__  )",
+		"/_/  |_/_/   \\__, /\\__,_/____/",
+		"            /____/",
+		"",
+		"Argus Secure Execution Runtime",
+	}
+
+	for _, line := range logoLines {
+		fmt.Fprintln(w, centerText(line, 72))
+	}
+}
+
+func centerText(text string, width int) string {
+	if text == "" {
+		return ""
+	}
+	if len(text) >= width {
+		return text
+	}
+	leftPadding := (width - len(text)) / 2
+	return strings.Repeat(" ", leftPadding) + text
+}
+
+func printRunHeader(w io.Writer, scriptPath string, policyPath string) {
+	printRunTitle(w)
+	printTwoColumnFields(
+		w,
+		[2]string{"Target", scriptPath},
+		[2]string{"Policy", policyPath},
+	)
 	fmt.Fprintln(w)
+}
+
+func printChecks(w io.Writer, checks ...checkState) {
+	fmt.Fprint(w, "Checks: ")
+	for index, check := range checks {
+		if index > 0 {
+			fmt.Fprint(w, "  ")
+		}
+
+		marker := "✓"
+		if !check.passed {
+			marker = "✗"
+		}
+		fmt.Fprintf(w, "%s %s", marker, check.name)
+	}
+	fmt.Fprintln(w)
+}
+
+func printRunConfiguration(w io.Writer, loadedPolicy policy.Policy, timeout time.Duration) {
+	printSection(w, "Configuration")
+	printTwoColumnFields(
+		w,
+		[2]string{"Strict", enabledLabel(loadedPolicy.StrictMode)},
+		[2]string{"Chroot", enabledLabel(loadedPolicy.EnableChroot)},
+	)
+	printTwoColumnFields(
+		w,
+		[2]string{"Namespaces", namespaceLabel(loadedPolicy.EnableChroot)},
+		[2]string{"Seccomp", seccompLabel(loadedPolicy.EnableSeccomp, loadedPolicy.SeccompProfile)},
+	)
+	printTwoColumnFields(
+		w,
+		[2]string{"Memory", fmt.Sprintf("%d MB", loadedPolicy.MemoryLimitMB)},
+		[2]string{"PID limit", strconv.Itoa(loadedPolicy.PidsLimit)},
+	)
+	printTwoColumnFields(
+		w,
+		[2]string{"CPU quota", fmt.Sprintf("%d/%d", loadedPolicy.CPUQuota, loadedPolicy.CPUPeriod)},
+		[2]string{"Timeout", formatDuration(timeout)},
+	)
+	printTwoColumnFields(
+		w,
+		[2]string{"Sandbox", sandboxLabel(loadedPolicy.KeepSandbox)},
+		[2]string{"Rootfs", loadedPolicy.RootfsPath},
+	)
 }
 
 func printExecutionResult(w io.Writer, result runner.Result) {
-	printSection(w, "Execution result")
-	printField(w, "Run ID", result.RunID)
-	printField(w, "Status", result.Status)
+	printSection(w, "Result")
+	fmt.Fprintf(w, "%s %s\n", statusMarker(result.Status), result.Status)
 	if reason := resultReason(result); reason != "" {
 		printField(w, "Reason", reason)
 	}
-	if result.PID != 0 {
-		printField(w, "Process ID", result.PID)
-	}
-	if result.Duration != 0 {
-		printField(w, "Execution time", result.Duration)
-	}
-	if peakMemory := formatPeakMemory(result.MonitorResults["PeakVmRSS"]); peakMemory != "" {
-		printField(w, "Peak memory", peakMemory)
-	}
-	if memoryExceeded, ok := result.MonitorResults["MemoryExceeded"]; ok {
-		printField(w, "Memory exceeded", memoryExceeded)
-	}
-	if result.SandboxKept && result.SandboxPath != "" {
-		printField(w, "Sandbox retained", result.SandboxPath)
-	}
+	fmt.Fprintln(w)
+
+	printTwoColumnFields(
+		w,
+		[2]string{"Run ID", result.RunID},
+		[2]string{"PID", pidLabel(result.PID)},
+	)
+	printTwoColumnFields(
+		w,
+		[2]string{"Time", formatDuration(result.Duration)},
+		[2]string{"Peak RSS", formatPeakMemory(result.MonitorResults["PeakVmRSS"])},
+	)
+	printTwoColumnFields(
+		w,
+		[2]string{"Memory hit", mapValueOr(result.MonitorResults, "MemoryExceeded", "unknown")},
+		[2]string{"Sandbox", resultSandboxLabel(result)},
+	)
 	fmt.Fprintln(w)
 }
 
+func printTwoColumnFields(w io.Writer, left [2]string, right [2]string) {
+	fmt.Fprintf(
+		w,
+		"%-12s %-22s  %-12s %s\n",
+		left[0],
+		left[1],
+		right[0],
+		right[1],
+	)
+}
+
 func printProgramOutput(w io.Writer, output string) {
-	printSection(w, "Program output")
+	printSection(w, "Output")
 	if strings.TrimSpace(output) == "" {
 		fmt.Fprintln(w, "No program output.")
 		return
@@ -379,7 +484,7 @@ func enabledLabel(enabled bool) string {
 
 func namespaceLabel(enableChroot bool) string {
 	if enableChroot {
-		return "mount + PID + network"
+		return "mount | pid | network"
 	}
 	return "disabled"
 }
@@ -394,10 +499,62 @@ func seccompLabel(enableSeccomp bool, profile string) string {
 	return profile
 }
 
+func sandboxLabel(keepSandbox bool) string {
+	if keepSandbox {
+		return "retained"
+	}
+	return "temporary"
+}
+
+func resultSandboxLabel(result runner.Result) string {
+	if result.SandboxKept && result.SandboxPath != "" {
+		return "retained"
+	}
+	if result.SandboxPath != "" {
+		return "temporary"
+	}
+	return "unknown"
+}
+
+func pidLabel(pid int) string {
+	if pid == 0 {
+		return "unknown"
+	}
+	return strconv.Itoa(pid)
+}
+
+func statusMarker(status string) string {
+	switch status {
+	case "SUCCESS":
+		return "✓"
+	case "TIMEOUT", "MEMORY_LIMIT_EXCEEDED", "SECURITY_VIOLATION", "ERROR":
+		return "✗"
+	default:
+		return "!"
+	}
+}
+
+func formatDuration(duration time.Duration) string {
+	if duration == 0 {
+		return "unknown"
+	}
+	if duration < time.Second {
+		return fmt.Sprintf("%d ms", duration.Milliseconds())
+	}
+	return duration.String()
+}
+
+func mapValueOr(values map[string]string, key string, fallback string) string {
+	if value, ok := values[key]; ok && value != "" {
+		return value
+	}
+	return fallback
+}
+
 func formatPeakMemory(value string) string {
 	fields := strings.Fields(value)
 	if len(fields) == 0 {
-		return ""
+		return "unknown"
 	}
 
 	kib, err := strconv.Atoi(fields[0])

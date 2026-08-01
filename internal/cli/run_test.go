@@ -60,10 +60,11 @@ func TestRunScriptMapsExecutionStatuses(t *testing.T) {
 
 			text := stdout.String()
 			for _, want := range []string{
-				"Secure execution",
-				"[PASS] Policy loaded",
-				"[PASS] Static pattern scan completed",
-				"Execution result",
+				"Argus Secure Execution Runtime",
+				"___",
+				"Checks: ✓ Policy",
+				"Configuration",
+				"Result",
 				"Reports",
 			} {
 				if !strings.Contains(text, want) {
@@ -179,7 +180,8 @@ func TestRunScriptTimeoutPrintsReasonWithoutTrailingStderr(t *testing.T) {
 	if stderr.String() != "" {
 		t.Fatalf("timeout should not print trailing stderr, got %q", stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "Reason") ||
+	if !strings.Contains(stdout.String(), "✗ TIMEOUT") ||
+		!strings.Contains(stdout.String(), "Reason") ||
 		!strings.Contains(stdout.String(), "Execution exceeded the 15s limit") {
 		t.Fatalf("timeout output missing reason field:\n%s", stdout.String())
 	}
@@ -242,7 +244,7 @@ func TestFormatPeakMemory(t *testing.T) {
 		value string
 		want  string
 	}{
-		{value: "", want: ""},
+		{value: "", want: "unknown"},
 		{value: "0 kB", want: "not sampled"},
 		{value: "512 kB", want: "< 1 MB"},
 		{value: "1024 kB", want: "1 MB"},
