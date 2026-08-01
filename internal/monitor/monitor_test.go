@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestReadStatus(t *testing.T) {
@@ -291,6 +292,20 @@ func TestIsSuspiciousCommand(t *testing.T) {
 				t.Fatalf("IsSuspiciousCommand(%q) = %v, want %v", tt.command, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestPollStatusSamplesImmediately(t *testing.T) {
+	root := useFakeProc(t)
+	writeProcFile(t, root, "123/status", "Name:\tpython3\nState:\tR (running)\nVmRSS:\t2048 kB\nThreads:\t1\n")
+
+	done := make(chan struct{})
+	memoryExceeded := make(chan struct{}, 1)
+	close(done)
+
+	got := PollStatus(123, time.Hour, done, 100, memoryExceeded)
+	if got["PeakVmRSS"] != "2048 kB" {
+		t.Fatalf("PollStatus immediate PeakVmRSS = %q, want %q", got["PeakVmRSS"], "2048 kB")
 	}
 }
 

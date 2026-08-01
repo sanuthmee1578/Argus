@@ -1,24 +1,97 @@
 package main
 
 import (
-	"argus/internal/behavior"
-	"argus/internal/logger"
+	"argus/internal/cli"
 	"argus/internal/policy"
 	"argus/internal/rootfs"
-	"argus/internal/runner"
-	"argus/internal/scanner"
 	"fmt"
 	"os"
-	"time"
 )
 
 func main() {
 
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: argus <command>")
+		cli.PrintHelp(os.Stdout)
 		return
 	}
 	command := os.Args[1]
+
+	switch command {
+	case "help", "--help", "-h":
+		cli.PrintHelp(os.Stdout)
+		return
+
+	case "version", "--version", "-v":
+		cli.PrintVersion(os.Stdout)
+		return
+
+	case "doctor":
+		exitCode := cli.RunDoctor(
+			os.Stdout,
+			"./config/policy.json",
+		)
+		if exitCode != 0 {
+			os.Exit(exitCode)
+		}
+		return
+
+	case "scan":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(
+				os.Stderr,
+				"Usage: argus scan <script>",
+			)
+			os.Exit(cli.ExitGeneralError)
+		}
+
+		exitCode := cli.RunScan(
+			os.Stdout,
+			"./config/policy.json",
+			os.Args[2],
+		)
+
+		os.Exit(exitCode)
+
+	case "run":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "Usage: argus run <script>")
+			os.Exit(cli.ExitGeneralError)
+		}
+
+		os.Exit(cli.RunScript(
+			os.Stdin,
+			os.Stdout,
+			os.Stderr,
+			"./config/policy.json",
+			os.Args[2],
+		))
+
+	case "inspect":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "Usage: argus inspect <run-id>")
+			os.Exit(cli.ExitGeneralError)
+		}
+
+		os.Exit(cli.RunInspect(
+			os.Stdout,
+			os.Stderr,
+			"reports",
+			os.Args[2],
+		))
+
+	case "clean":
+		if len(os.Args) > 2 {
+			fmt.Fprintln(os.Stderr, "Usage: argus clean")
+			os.Exit(cli.ExitGeneralError)
+		}
+
+		os.Exit(cli.RunClean(
+			os.Stdout,
+			os.Stderr,
+			"./config/policy.json",
+		))
+	}
+
 	if command == "setup-rootfs" {
 		loadPolicy, err := policy.Load("./config/policy.json")
 		if err != nil {
@@ -40,96 +113,5 @@ func main() {
 		return
 	}
 
-	if command != "run" {
-		fmt.Println("Unknown command:", command)
-		return
-	}
-	// Check if enough arguments are provided
-	if len(os.Args) < 3 {
-		fmt.Println("Usage: argus run <script>")
-		return
-	}
-	// Extract the script from the arguments
-	script := os.Args[2]
-
-	if _, err := os.Stat(script); os.IsNotExist(err) {
-		fmt.Println("Script not found:", script)
-		return
-	}
-
-	loadPolicy, err := policy.Load("./config/policy.json")
-	if err != nil {
-		fmt.Println("Failed to load policy:", err)
-		os.Exit(1)
-	}
-
-	warnings := scanner.Scan(loadPolicy.BlockedPatterns, script)
-
-	analysis := behavior.Analyze(warnings)
-
-	// Print the command and script for debugging purposes
-	fmt.Println("Command:", command)
-	fmt.Println("Script:", script)
-
-	if len(warnings) > 0 {
-		if loadPolicy.StrictMode {
-			fmt.Println("⚠ Strict mode enabled. Execution blocked due to suspicious patterns.")
-			logger.Write(script, "BLOCKED_BY_POLICY", "Script blocked due to strict mode.", warnings, time.Duration(0), 0, time.Time{}, time.Time{}, map[string]string{}, analysis)
-			return
-		} else {
-			var choice string
-			fmt.Println("⚠ Suspicious patterns detected in the script. Do you want to proceed? (y/n)")
-			fmt.Scanln(&choice)
-			if choice != "y" {
-				fmt.Println("BLOCKED_BY_USER")
-				fmt.Println("⚠ Warning:")
-				for _, warning := range warnings {
-					fmt.Println("-", warning)
-				}
-
-				err = logger.Write(script, "BLOCKED_BY_USER", "Execution aborted by the user.", warnings, time.Duration(0), 0, time.Time{}, time.Time{}, map[string]string{}, analysis)
-				if err != nil {
-					fmt.Println("Error writing log:", err)
-				}
-				return
-
-			} else if choice == "y" {
-				fmt.Println("Proceeding with execution...")
-				fmt.Println("⚠ Warning:")
-				for _, warning := range warnings {
-					fmt.Println("-", warning)
-				}
-			}
-		}
-	}
-
-	if loadPolicy.EnableChroot {
-		if os.Geteuid() != 0 {
-			fmt.Println("Chroot mode requires root privileges. Run with sudo or disable enable_chroot.")
-			return
-		}
-
-		missing := rootfs.Validate(loadPolicy.RootfsPath)
-
-		if len(missing) > 0 {
-			fmt.Println("Rootfs validation failed:")
-
-			for _, issue := range missing {
-				fmt.Println("-", issue)
-			}
-
-			return
-		}
-	}
-
-	timeout := time.Duration(loadPolicy.Timeout) * time.Second
-	status, output, duration, pid, startTime, endTime, monitorResults := runner.Run(script, timeout, loadPolicy.MemoryLimitMB, loadPolicy.KeepSandbox, loadPolicy.RootfsPath, loadPolicy.EnableChroot, loadPolicy.EnableSeccomp, loadPolicy.SeccompProfile, loadPolicy.PidsLimit, loadPolicy.CPUQuota, loadPolicy.CPUPeriod)
-	err = logger.Write(script, status, output, warnings, duration, pid, startTime, endTime, monitorResults, analysis)
-	if err != nil {
-		fmt.Println("Error writing log:", err)
-		return
-	}
-	fmt.Println("Status:", status)
-	fmt.Println("Output:", output)
-	fmt.Printf("Execution time: %v\n", duration)
+	fmt.Println("Unknown command:", command)
 }

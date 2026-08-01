@@ -11,27 +11,50 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
 
-func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bool, rootfsPath string, enableChroot bool, enableSeccomp bool, seccompProfile string, pidsLimit int, cpuQuota int, cpuPeriod int) (string, string, time.Duration, int, time.Time, time.Time, map[string]string) {
+func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bool, rootfsPath string, enableChroot bool, enableSeccomp bool, seccompProfile string, pidsLimit int, cpuQuota int, cpuPeriod int) Result {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	startTime := time.Now()
+	runID := strconv.FormatInt(time.Now().UnixNano(), 10)
 
 	prepared, err := sandbox.PrepareSandbox(script, enableChroot, rootfsPath)
 	if err != nil {
-		fmt.Println("Error preparing sandbox:", err)
 		endTime := time.Now()
-		return "ERROR", "", time.Since(startTime), 0, startTime, endTime, map[string]string{}
+		return Result{
+			RunID:          runID,
+			Status:         "ERROR",
+			ErrorMessage:   fmt.Sprintf("prepare sandbox: %v", err),
+			Duration:       time.Since(startTime),
+			StartTime:      startTime,
+			EndTime:        endTime,
+			MonitorResults: map[string]string{},
+			SandboxKept:    keepSandbox,
+		}
+	}
+
+	if !keepSandbox {
+		defer os.RemoveAll(prepared.HostPath)
 	}
 
 	helperPath, err := filepath.Abs("bin/argus-exec")
 	if err != nil {
-		fmt.Println("Error resolving argus-exec path:", err)
 		endTime := time.Now()
-		return "ERROR", "", time.Since(startTime), 0, startTime, endTime, map[string]string{}
+		return Result{
+			RunID:          runID,
+			Status:         "ERROR",
+			ErrorMessage:   fmt.Sprintf("resolve argus-exec path: %v", err),
+			Duration:       time.Since(startTime),
+			StartTime:      startTime,
+			EndTime:        endTime,
+			MonitorResults: map[string]string{},
+			SandboxPath:    prepared.HostPath,
+			SandboxKept:    keepSandbox,
+		}
 	}
 	var cmd *exec.Cmd
 
@@ -83,17 +106,9 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 		}
 	}
 
-	if !keepSandbox {
-		defer os.RemoveAll(prepared.HostPath)
-	} else {
-		fmt.Println("Sandbox kept at:", prepared.HostPath)
-	}
-
 	var outputBuffer bytes.Buffer
 	cmd.Stdout = &outputBuffer
 	cmd.Stderr = &outputBuffer
-
-	runID := strconv.FormatInt(time.Now().UnixNano(), 10)
 
 	cgroupPath, err := cgroup.Create(
 		runID,
@@ -104,45 +119,70 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 	)
 
 	if err != nil {
-		fmt.Println("Error creating cgroup:", err)
 		endTime := time.Now()
-		return "ERROR", "", time.Since(startTime), 0, startTime, endTime, map[string]string{}
+		return Result{
+			RunID:          runID,
+			Status:         "ERROR",
+			ErrorMessage:   fmt.Sprintf("create cgroup: %v", err),
+			Duration:       time.Since(startTime),
+			StartTime:      startTime,
+			EndTime:        endTime,
+			MonitorResults: map[string]string{},
+			SandboxPath:    prepared.HostPath,
+			SandboxKept:    keepSandbox,
+		}
 	}
 
 	defer func() {
-		if err := cgroup.Cleanup(cgroupPath); err != nil {
-			fmt.Println("Error cleaning up cgroup:", err)
-		}
+		_ = cgroup.Cleanup(cgroupPath)
 	}()
+
+	cgroupDir, err := os.Open(cgroupPath)
+	if err != nil {
+		endTime := time.Now()
+		return Result{
+			RunID:          runID,
+			Status:         "ERROR",
+			ErrorMessage:   fmt.Sprintf("open cgroup for process placement: %v", err),
+			Duration:       time.Since(startTime),
+			StartTime:      startTime,
+			EndTime:        endTime,
+			MonitorResults: map[string]string{},
+			SandboxPath:    prepared.HostPath,
+			SandboxKept:    keepSandbox,
+		}
+	}
+	defer cgroupDir.Close()
+
+	configureCgroupPlacement(cmd, cgroupDir)
 
 	err = cmd.Start()
 	if err != nil {
-		fmt.Println("Error starting Script:", err)
 		endTime := time.Now()
-		return "ERROR", "", time.Since(startTime), 0, startTime, endTime, map[string]string{}
+		return Result{
+			RunID:          runID,
+			Status:         "ERROR",
+			ErrorMessage:   fmt.Sprintf("start script: %v", err),
+			Duration:       time.Since(startTime),
+			StartTime:      startTime,
+			EndTime:        endTime,
+			MonitorResults: map[string]string{},
+			SandboxPath:    prepared.HostPath,
+			SandboxKept:    keepSandbox,
+		}
 	}
 
 	pid := cmd.Process.Pid
 
 	done := make(chan struct{})
 
-	memoryExceededChan := make(chan struct{})
+	memoryExceededChan := make(chan struct{}, 1)
 
 	monitorResultsChan := make(chan map[string]string)
 
 	go func() {
 		monitorResultsChan <- monitor.PollStatus(pid, 100*time.Millisecond, done, memoryLimitMB, memoryExceededChan)
 	}()
-
-	fmt.Println("Script PID:", pid)
-
-	err = cgroup.Attach(cgroupPath, pid)
-	if err != nil {
-		fmt.Println("Error attaching to cgroup:", err)
-		syscall.Kill(-pid, syscall.SIGKILL)
-		endTime := time.Now()
-		return "ERROR", "", time.Since(startTime), pid, startTime, endTime, map[string]string{}
-	}
 
 	waitChan := make(chan error)
 
@@ -174,18 +214,96 @@ func Run(script string, timeout time.Duration, memoryLimitMB int, keepSandbox bo
 	output := outputBuffer.String()
 
 	if monitorResults["MemoryExceeded"] == "true" {
-		fmt.Println("Memory limit exceeded")
-		return "MEMORY_LIMIT_EXCEEDED", output, time.Since(startTime), pid, startTime, endTime, monitorResults
+		return Result{
+			RunID:          runID,
+			Status:         "MEMORY_LIMIT_EXCEEDED",
+			Output:         output,
+			Duration:       time.Since(startTime),
+			PID:            pid,
+			StartTime:      startTime,
+			EndTime:        endTime,
+			MonitorResults: monitorResults,
+			SandboxPath:    prepared.HostPath,
+			SandboxKept:    keepSandbox,
+		}
 	}
 
 	if ctx.Err() == context.DeadlineExceeded {
-		fmt.Println("Script execution timed out")
-		return "TIMEOUT", string(output), time.Since(startTime), pid, startTime, endTime, monitorResults
+		return Result{
+			RunID:          runID,
+			Status:         "TIMEOUT",
+			Output:         output,
+			ErrorMessage:   fmt.Sprintf("Execution exceeded the %s limit", timeout),
+			Duration:       time.Since(startTime),
+			PID:            pid,
+			StartTime:      startTime,
+			EndTime:        endTime,
+			MonitorResults: monitorResults,
+			SandboxPath:    prepared.HostPath,
+			SandboxKept:    keepSandbox,
+		}
 	} else if err != nil {
-		fmt.Println("Error executing Script:", err)
-		return "ERROR", string(output), time.Since(startTime), pid, startTime, endTime, monitorResults
+		if isSeccompNetworkViolation(output, enableSeccomp, seccompProfile) {
+			return Result{
+				RunID:          runID,
+				Status:         "SECURITY_VIOLATION",
+				Output:         output,
+				ErrorMessage:   "Network syscall blocked by seccomp",
+				Duration:       time.Since(startTime),
+				PID:            pid,
+				StartTime:      startTime,
+				EndTime:        endTime,
+				MonitorResults: monitorResults,
+				SandboxPath:    prepared.HostPath,
+				SandboxKept:    keepSandbox,
+			}
+		}
+
+		return Result{
+			RunID:          runID,
+			Status:         "ERROR",
+			Output:         output,
+			ErrorMessage:   fmt.Sprintf("execute script: %v", err),
+			Duration:       time.Since(startTime),
+			PID:            pid,
+			StartTime:      startTime,
+			EndTime:        endTime,
+			MonitorResults: monitorResults,
+			SandboxPath:    prepared.HostPath,
+			SandboxKept:    keepSandbox,
+		}
 	}
 
 	sinceTime := time.Since(startTime)
-	return "SUCCESS", string(output), sinceTime, pid, startTime, endTime, monitorResults
+	return Result{
+		RunID:          runID,
+		Status:         "SUCCESS",
+		Output:         output,
+		Duration:       sinceTime,
+		PID:            pid,
+		StartTime:      startTime,
+		EndTime:        endTime,
+		MonitorResults: monitorResults,
+		SandboxPath:    prepared.HostPath,
+		SandboxKept:    keepSandbox,
+	}
+}
+
+func isSeccompNetworkViolation(output string, enableSeccomp bool, seccompProfile string) bool {
+	if !enableSeccomp || seccompProfile != "no-network" {
+		return false
+	}
+
+	normalizedOutput := strings.ToLower(output)
+	return strings.Contains(normalizedOutput, "permissionerror") &&
+		strings.Contains(normalizedOutput, "operation not permitted")
+}
+
+func configureCgroupPlacement(cmd *exec.Cmd, cgroupDir *os.File) {
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+
+	cmd.SysProcAttr.UseCgroupFD = true
+	cmd.SysProcAttr.CgroupFD = int(cgroupDir.Fd())
 }

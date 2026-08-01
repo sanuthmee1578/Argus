@@ -8,12 +8,11 @@ import (
 )
 
 func main() {
-	fmt.Println("argus-exec helper started")
-
-	fmt.Println("Args:", os.Args)
-
 	if len(os.Args) < 4 {
-		fmt.Println("Usage: argus-exec <profile> <program> <script>")
+		fmt.Fprintln(
+			os.Stderr,
+			"usage: argus-exec <profile> <program> <script>",
+		)
 		os.Exit(1)
 	}
 
@@ -21,18 +20,22 @@ func main() {
 	program := os.Args[2]
 	script := os.Args[3]
 
-	fmt.Println("Profile:", profile)
-	fmt.Println("Program:", program)
-	fmt.Println("Script:", script)
-
 	if err := seccomp.ApplyProfile(profile); err != nil {
-		fmt.Fprintf(os.Stderr, "apply seccomp profile: %v\n", err)
+		fmt.Fprintf(
+			os.Stderr,
+			"apply seccomp profile %q: %v\n",
+			profile,
+			err,
+		)
 		os.Exit(1)
 	}
 
-	err := syscall.Exec(program, []string{program, script}, os.Environ())
-	if err != nil {
-		fmt.Println("Failed to exec program:", err)
+	if err := syscall.Exec(
+		program,
+		[]string{program, script},
+		os.Environ(),
+	); err != nil {
+		fmt.Fprintf(os.Stderr, "execute %q: %v\n", program, err)
 		os.Exit(1)
 	}
 }

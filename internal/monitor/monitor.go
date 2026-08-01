@@ -65,6 +65,19 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 	suspiciousDetails := map[string]string{}         // Key: PID+Name, Value: full label with command
 	childHistory := map[string]ChildProcessDetails{} // Track all children ever seen
 
+	peakVmRSS, memoryExceeded, alertSent, childProcesses = sampleStatus(
+		pid,
+		peakVmRSS,
+		memoryLimitMB,
+		memoryExceeded,
+		alertSent,
+		memoryExceededChan,
+		childProcesses,
+		childHistory,
+		seenSuspicious,
+		suspiciousDetails,
+	)
+
 	for {
 		select {
 		case <-done:
@@ -99,79 +112,98 @@ func PollStatus(pid int, interval time.Duration, done <-chan struct{}, memoryLim
 			}
 
 		case <-ticker.C:
-			status := ReadStatus(pid)
-			current := status["VmRSS"]
-
-			if current != "" {
-				fields := strings.Fields(current)
-				memory := fields[0]
-				memoryInt, err := strconv.Atoi(memory)
-				if err != nil {
-					fmt.Println("Error converting memory usage:", err)
-					continue
-				}
-
-				peakFields := strings.Fields(peakVmRSS)
-				peakMemory := peakFields[0]
-				peakInt, err := strconv.Atoi(peakMemory)
-
-				if err != nil {
-					fmt.Println("Error converting peak memory usage:", err)
-					continue
-				}
-
-				if memoryInt > peakInt {
-					peakVmRSS = current
-				}
-
-				if memoryInt > memoryLimitMB*1024 {
-					memoryExceeded = true
-					if !alertSent {
-						memoryExceededChan <- struct{}{}
-						alertSent = true
-					}
-				}
-
-			}
-
-			childDetails := ReadChildrenDetails(pid)
-
-			if len(childDetails) > 0 {
-				var details []string
-				for _, child := range childDetails {
-					// Use cached command from history if available (in case process is exiting)
-					command := child.Command
-					if cachedChild, exists := childHistory[child.PID]; exists {
-						command = cachedChild.Command
-					}
-					details = append(details, child.PID+" "+child.Name+" "+command)
-
-					// Step 2: Track all children ever seen (history)
-					// Only add/update if this PID wasn't seen before, preserving command even after process exits
-					if _, exists := childHistory[child.PID]; !exists {
-						childHistory[child.PID] = child
-					}
-				}
-				childProcesses = details
-			}
-
-			for _, child := range childDetails {
-				// Step 3: Check both process name and command pattern for suspicious behavior
-				if IsSuspiciousProcess(child.Name, child.Command) {
-					dedupKey := child.PID + ":" + child.Name // Use PID+Name as stable key
-
-					if !seenSuspicious[dedupKey] {
-						label := child.Name + "(PID:" + child.PID + ") cmd:" + child.Command
-						suspiciousDetails[dedupKey] = label
-						seenSuspicious[dedupKey] = true
-					}
-				}
-			}
+			peakVmRSS, memoryExceeded, alertSent, childProcesses = sampleStatus(
+				pid,
+				peakVmRSS,
+				memoryLimitMB,
+				memoryExceeded,
+				alertSent,
+				memoryExceededChan,
+				childProcesses,
+				childHistory,
+				seenSuspicious,
+				suspiciousDetails,
+			)
 
 		}
 
 	}
 
+}
+
+func sampleStatus(
+	pid int,
+	peakVmRSS string,
+	memoryLimitMB int,
+	memoryExceeded bool,
+	alertSent bool,
+	memoryExceededChan chan<- struct{},
+	childProcesses []string,
+	childHistory map[string]ChildProcessDetails,
+	seenSuspicious map[string]bool,
+	suspiciousDetails map[string]string,
+) (string, bool, bool, []string) {
+	status := ReadStatus(pid)
+	current := status["VmRSS"]
+
+	if current != "" {
+		fields := strings.Fields(current)
+		memory := fields[0]
+		memoryInt, err := strconv.Atoi(memory)
+		if err != nil {
+			fmt.Println("Error converting memory usage:", err)
+		} else {
+			peakFields := strings.Fields(peakVmRSS)
+			peakMemory := peakFields[0]
+			peakInt, err := strconv.Atoi(peakMemory)
+
+			if err != nil {
+				fmt.Println("Error converting peak memory usage:", err)
+			} else if memoryInt > peakInt {
+				peakVmRSS = current
+			}
+
+			if memoryInt > memoryLimitMB*1024 {
+				memoryExceeded = true
+				if !alertSent {
+					memoryExceededChan <- struct{}{}
+					alertSent = true
+				}
+			}
+		}
+	}
+
+	childDetails := ReadChildrenDetails(pid)
+
+	if len(childDetails) > 0 {
+		childProcesses = []string{}
+		for _, child := range childDetails {
+			// Use cached command from history if available in case the process is exiting.
+			command := child.Command
+			if cachedChild, exists := childHistory[child.PID]; exists {
+				command = cachedChild.Command
+			}
+			childProcesses = append(childProcesses, child.PID+" "+child.Name+" "+command)
+
+			if _, exists := childHistory[child.PID]; !exists {
+				childHistory[child.PID] = child
+			}
+		}
+	}
+
+	for _, child := range childDetails {
+		if IsSuspiciousProcess(child.Name, child.Command) {
+			dedupKey := child.PID + ":" + child.Name
+
+			if !seenSuspicious[dedupKey] {
+				label := child.Name + "(PID:" + child.PID + ") cmd:" + child.Command
+				suspiciousDetails[dedupKey] = label
+				seenSuspicious[dedupKey] = true
+			}
+		}
+	}
+
+	return peakVmRSS, memoryExceeded, alertSent, childProcesses
 }
 
 func ReadChildren(pid int) []string {
