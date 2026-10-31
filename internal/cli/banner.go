@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-const Version = "0.1.0-dev"
+var Version = "0.1.0-dev"
 
 func PrintBanner(w io.Writer) {
 	fmt.Fprint(w, "\n"+
