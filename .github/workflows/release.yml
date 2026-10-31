@@ -27,6 +27,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libseccomp-dev pkg-config
 
+      - name: Determine release version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Invalid release tag: $GITHUB_REF_NAME"
+              exit 1
+            fi
+
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.2.0-preview"
+          fi
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Selected Argus version: $VERSION"
+
       - name: Run tests
         run: |
           go test -count=1 ./...
@@ -37,7 +56,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          VERSION="0.2.0-preview"
           PACKAGE="argus-${VERSION}-linux-amd64"
 
           mkdir -p "dist/${PACKAGE}/config"
@@ -71,7 +89,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          VERSION="0.2.0-preview"
           PACKAGE="argus-${VERSION}-linux-amd64"
 
           mkdir -p release-check
@@ -93,10 +110,10 @@ jobs:
           # Run from outside the installation directory
           cd /tmp
 
-          "${INSTALL_DIR}/argus" version | grep -F "0.2.0-preview"
+          "${INSTALL_DIR}/argus" version | grep -F "$VERSION"
           "${INSTALL_DIR}/argus" help | grep -F "setup-rootfs"
 
-                    # Verify executable-relative policy discovery
+          # Verify executable-relative policy discovery
           DOCTOR_LOG="${RUNNER_TEMP}/argus-release-doctor.log"
 
           "${INSTALL_DIR}/argus" doctor > "${DOCTOR_LOG}" || true
