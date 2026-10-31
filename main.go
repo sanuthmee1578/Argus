@@ -16,6 +16,22 @@ func main() {
 	}
 	command := os.Args[1]
 
+	if command == "setup-rootfs" && len(os.Args) > 2 {
+		fmt.Fprintln(os.Stderr, "Usage: argus setup-rootfs")
+		os.Exit(cli.ExitGeneralError)
+	}
+	var policyPath string
+
+	switch command {
+	case "doctor", "scan", "run", "clean", "setup-rootfs":
+		var err error
+		policyPath, err = cli.ResolveDefaultPolicyPath()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Configuration error:", err)
+			os.Exit(cli.ExitGeneralError)
+		}
+	}
+
 	switch command {
 	case "help", "--help", "-h":
 		cli.PrintHelp(os.Stdout)
@@ -28,7 +44,7 @@ func main() {
 	case "doctor":
 		exitCode := cli.RunDoctor(
 			os.Stdout,
-			"./config/policy.json",
+			policyPath,
 		)
 		if exitCode != 0 {
 			os.Exit(exitCode)
@@ -46,7 +62,7 @@ func main() {
 
 		exitCode := cli.RunScan(
 			os.Stdout,
-			"./config/policy.json",
+			policyPath,
 			os.Args[2],
 		)
 
@@ -62,7 +78,7 @@ func main() {
 			os.Stdin,
 			os.Stdout,
 			os.Stderr,
-			"./config/policy.json",
+			policyPath,
 			os.Args[2],
 		))
 
@@ -88,12 +104,12 @@ func main() {
 		os.Exit(cli.RunClean(
 			os.Stdout,
 			os.Stderr,
-			"./config/policy.json",
+			policyPath,
 		))
 	}
 
 	if command == "setup-rootfs" {
-		loadPolicy, err := policy.Load("./config/policy.json")
+		loadPolicy, err := policy.Load(policyPath)
 		if err != nil {
 			fmt.Println("Failed to load policy:", err)
 			os.Exit(1)

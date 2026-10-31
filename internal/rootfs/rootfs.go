@@ -54,6 +54,33 @@ func createDevNull(rootfsPath string) error {
 	return os.Chmod(devNullPath, 0666)
 }
 
+func resolveHelperPath() (string, error) {
+	executablePath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("locate Argus executable: %w", err)
+	}
+
+	return resolveHelperFromDir(filepath.Dir(executablePath))
+}
+
+func resolveHelperFromDir(executableDir string) (string, error) {
+	candidates := []string{
+		filepath.Join(executableDir, "argus-exec"),
+		filepath.Join(executableDir, "bin", "argus-exec"),
+	}
+
+	for _, candidate := range candidates {
+		info, err := os.Stat(candidate)
+		if err == nil && info.Mode().IsRegular() {
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf(
+		"argus-exec helper not found beside Argus executable or in its bin directory",
+	)
+}
+
 func Setup(rootfsPath string) error {
 	// Create necessary directories
 	dirs := []string{
@@ -77,7 +104,7 @@ func Setup(rootfsPath string) error {
 		return err
 	}
 
-	helperSrc, err := filepath.Abs("bin/argus-exec")
+	helperSrc, err := resolveHelperPath()
 	if err != nil {
 		return err
 	}
