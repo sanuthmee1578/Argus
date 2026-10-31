@@ -1,0 +1,76 @@
+
+name: Argus Release Packaging
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build and Package
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libseccomp-dev pkg-config
+
+      - name: Run tests
+        run: |
+          go test -count=1 ./...
+          go test -race -count=1 ./...
+
+      - name: Build release binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="0.2.0-preview"
+          PACKAGE="argus-${VERSION}-linux-amd64"
+
+          mkdir -p "dist/${PACKAGE}/config"
+
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+            go build \
+            -ldflags="-X argus/internal/cli.Version=${VERSION}" \
+            -o "dist/${PACKAGE}/argus" .
+
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+            go build \
+            -o "dist/${PACKAGE}/argus-exec" ./cmd/argus-exec
+
+          cp config/policy.json "dist/${PACKAGE}/config/"
+          cp README.md "dist/${PACKAGE}/"
+
+          if [ -f LICENSE ]; then
+            cp LICENSE "dist/${PACKAGE}/"
+          fi
+
+          "dist/${PACKAGE}/argus" version
+
+          tar -czf "dist/${PACKAGE}.tar.gz" \
+            -C dist "${PACKAGE}"
+
+          cd dist
+          sha256sum "${PACKAGE}.tar.gz" > SHA256SUMS
+
+      - name: Upload release package
+        uses: actions/upload-artifact@v4
+        with:
+          name: argus-release-preview
+          path: |
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          retention-days: 7
