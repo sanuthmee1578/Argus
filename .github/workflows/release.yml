@@ -97,9 +97,12 @@ jobs:
           "${INSTALL_DIR}/argus" help | grep -F "setup-rootfs"
 
                     # Verify executable-relative policy discovery
-          "${INSTALL_DIR}/argus" doctor > /tmp/argus-release-doctor.log || true
-          grep -F "[PASS] Policy configuration" /tmp/argus-release-doctor.log
-          grep -F "${INSTALL_DIR}/config/policy.json" /tmp/argus-release-doctor.
+          DOCTOR_LOG="${RUNNER_TEMP}/argus-release-doctor.log"
+
+          "${INSTALL_DIR}/argus" doctor > "${DOCTOR_LOG}" || true
+
+          grep -F "[PASS] Policy configuration" "${DOCTOR_LOG}"
+          grep -F "${INSTALL_DIR}/config/policy.json" "${DOCTOR_LOG}"
           
           echo "Release package smoke tests passed."
       - name: Upload release package
