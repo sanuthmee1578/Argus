@@ -66,6 +66,42 @@ jobs:
           cd dist
           sha256sum "${PACKAGE}.tar.gz" > SHA256SUMS
 
+      - name: Smoke test packaged release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="0.2.0-preview"
+          PACKAGE="argus-${VERSION}-linux-amd64"
+
+          mkdir -p release-check
+          tar -xzf "dist/${PACKAGE}.tar.gz" -C release-check
+
+          INSTALL_DIR="${GITHUB_WORKSPACE}/release-check/${PACKAGE}"
+
+          # Confirm required files are present
+          test -x "${INSTALL_DIR}/argus"
+          test -x "${INSTALL_DIR}/argus-exec"
+          test -f "${INSTALL_DIR}/config/policy.json"
+
+          # Verify the archive checksum
+          (
+            cd dist
+            sha256sum -c SHA256SUMS
+          )
+
+          # Run from outside the installation directory
+          cd /tmp
+
+          "${INSTALL_DIR}/argus" version | grep -F "0.2.0-preview"
+          "${INSTALL_DIR}/argus" help | grep -F "setup-rootfs"
+
+                    # Verify executable-relative policy discovery
+          "${INSTALL_DIR}/argus" doctor > /tmp/argus-release-doctor.log || true
+          grep -F "[PASS] Policy configuration" /tmp/argus-release-doctor.log
+          grep -F "${INSTALL_DIR}/config/policy.json" /tmp/argus-release-doctor.
+          
+          echo "Release package smoke tests passed."
       - name: Upload release package
         uses: actions/upload-artifact@v4
         with:
