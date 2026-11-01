@@ -3,6 +3,9 @@ name: Argus Release Packaging
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
@@ -11,6 +14,9 @@ jobs:
   package:
     name: Build and Package
     runs-on: ubuntu-24.04
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
 
     steps:
       - name: Checkout source
@@ -28,6 +34,7 @@ jobs:
           sudo apt-get install -y libseccomp-dev pkg-config
 
       - name: Determine release version
+        id: version
         shell: bash
         run: |
           set -euo pipefail
@@ -44,6 +51,7 @@ jobs:
           fi
 
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Selected Argus version: $VERSION"
 
       - name: Run tests
@@ -122,11 +130,88 @@ jobs:
           grep -F "${INSTALL_DIR}/config/policy.json" "${DOCTOR_LOG}"
           
           echo "Release package smoke tests passed."
+
+      - name: Verify release files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PACKAGE="argus-${VERSION}-linux-amd64"
+
+          test -s "dist/${PACKAGE}.tar.gz"
+          test -s "dist/SHA256SUMS"
+
+          echo "Both required release files exist."
+
       - name: Upload release package
         uses: actions/upload-artifact@v4
         with:
-          name: argus-release-preview
+          name: argus-release-${{ env.VERSION }}
           path: |
             dist/*.tar.gz
             dist/SHA256SUMS
+          if-no-files-found: error
           retention-days: 7
+
+  publish:
+    name: Publish GitHub Release
+    needs: package
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download verified release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: argus-release-${{ needs.package.outputs.version }}
+          path: release-files
+
+      - name: Verify downloaded release artifact
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          PACKAGE="argus-${RELEASE_VERSION}-linux-amd64"
+
+          test -s "release-files/${PACKAGE}.tar.gz"
+          test -s "release-files/SHA256SUMS"
+
+          cd release-files
+
+          EXPECTED_ENTRY="$(sha256sum "${PACKAGE}.tar.gz")"
+
+          grep -Fxq -- "$EXPECTED_ENTRY" SHA256SUMS
+
+          sha256sum -c SHA256SUMS
+
+          echo "Downloaded release artifact verified successfully."
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.package.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          EXPECTED_TAG="v${RELEASE_VERSION}"
+
+          if [[ "$GITHUB_REF_NAME" != "$EXPECTED_TAG" ]]; then
+            echo "Release tag mismatch."
+            exit 1
+          fi
+
+          PACKAGE="argus-${RELEASE_VERSION}-linux-amd64"
+
+          gh release create "$EXPECTED_TAG" \
+            "release-files/${PACKAGE}.tar.gz" \
+            "release-files/SHA256SUMS" \
+            --title "Argus ${EXPECTED_TAG}" \
+            --generate-notes
+
+          echo "GitHub Release ${EXPECTED_TAG} published successfully."
